@@ -92,19 +92,80 @@ canvas#world.dragging { cursor: grabbing; }
 .btn:hover { background: #4f3d73; }
 .btn:active, .btn.on { box-shadow: inset 3px 3px 0 rgba(0,0,0,.35); background: #241a36; color: var(--gold); }
 
-#sheet { right: calc(var(--inset-right) + 12px); top: calc(var(--inset-top) + 60px); width: 300px; display: none; }
-#sheet.open { display: block; }
-#sheet .head { display: flex; gap: 10px; align-items: center; }
-#portrait { width: 72px; height: 72px; background: #1f3a2a; border-radius: 10px; image-rendering: pixelated; flex: none; }
-#sheet h2 { margin: 0; font-family: 'Press Start 2P', monospace; font-size: 12px; color: var(--gold); }
-#sheet .cls { color: var(--muted); }
-#sheet .quest { margin-top: 8px; color: var(--cream); line-height: 1; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-top: 8px; }
-.stats div { display: flex; justify-content: space-between; }
+.stats div { display: flex; justify-content: space-between; gap: 6px; }
 .stats b { color: var(--gold); font-weight: normal; }
 .close { position: absolute; top: 6px; right: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--muted); }
 .close:hover { color: var(--red); }
 .doing { margin-top: 8px; background: var(--edge); padding: 4px 6px; color: var(--green); word-break: break-all; line-height: 1; min-height: 24px; }
+
+/* The agent card: compact beside the town, or expanded into a conversation you can type into. */
+#sheet {
+  right: calc(var(--inset-right) + 12px); top: calc(var(--inset-top) + 60px); width: 340px;
+  max-height: calc(100vh - var(--inset-top) - var(--inset-bottom) - 136px); overflow-y: auto; display: none;
+}
+#sheet.open { display: block; }
+#sheet.expanded.open {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px;
+  width: min(1040px, calc(100vw - var(--inset-left) - var(--inset-right) - 24px));
+  bottom: calc(var(--inset-bottom) + 76px); max-height: none; overflow: hidden;
+}
+#sheet.expanded #sheetInfo { grid-column: 2; grid-row: 1; overflow-y: auto; min-height: 0; }
+#sheet.expanded #sheetChat { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; min-height: 0; }
+.sheet-tools { position: absolute; top: 6px; right: 8px; display: flex; gap: 4px; z-index: 1; }
+.icon-btn { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; font-family: inherit; }
+.icon-btn:hover { color: var(--gold); }
+#sheet .head { display: flex; gap: 10px; align-items: center; padding-right: 48px; }
+#portrait { width: 64px; height: 64px; background: #1f3a2a; border-radius: 10px; image-rendering: pixelated; flex: none; }
+#sheet h2 { margin: 0; font-family: 'Press Start 2P', monospace; font-size: 12px; color: var(--gold); }
+#sheet .cls { color: var(--muted); line-height: 1; }
+#sheet .section { margin-top: 10px; margin-bottom: 3px; }
+.state-line { margin-top: 10px; padding: 6px 8px; border-radius: 6px; background: var(--edge); line-height: 1; color: var(--cream); border-left: 3px solid var(--muted); }
+.state-line.working { border-color: var(--green); }
+.state-line.needs { border-color: var(--gold); color: var(--gold); }
+.state-line.done { border-color: var(--green); color: var(--green); }
+.state-line.trouble { border-color: var(--red); }
+.task { line-height: 1; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.task.full, #sheet.expanded .task { display: block; -webkit-line-clamp: unset; max-height: 220px; overflow-y: auto; cursor: default; }
+.link { background: none; border: 0; padding: 0; margin-top: 6px; color: var(--blue); cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 8px; }
+#sheetMore, #blockedBox, #filesBox, #replyBox { display: none; }
+#sheetMore.open, #blockedBox.open, #filesBox.open, #replyBox.open { display: block; }
+#sheet.expanded #replyBox { display: none; }
+.activity, .files, .blocked { list-style: none; margin: 0; padding: 0; line-height: 1; }
+.activity li, .files li { display: flex; gap: 6px; padding: 1px 0; }
+.activity .t { color: var(--muted); flex: none; }
+.activity .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity .error .what { color: var(--red); }
+.activity .empty, .files .empty { color: var(--muted); }
+.files .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.files .dir { color: var(--muted); }
+.files .add { color: var(--green); flex: none; }
+.files .del { color: var(--red); flex: none; }
+.blocked li { background: var(--edge); padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; color: var(--gold); overflow-wrap: anywhere; }
+#btnRetry { margin-top: 4px; }
+.reply { background: var(--edge); padding: 6px 8px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1; max-height: 180px; overflow-y: auto; }
+#sheetChat .label, #chatThread { display: none; }
+#sheet.expanded #sheetChat .label { display: block; margin-bottom: 6px; }
+#sheet.expanded #chatThread { display: flex; }
+.thread { flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 6px; padding: 8px; background: rgba(14, 10, 22, .55); border-radius: 8px; user-select: text; }
+.msg { max-width: 85%; padding: 6px 9px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.05; }
+.msg .t { display: block; color: var(--muted); font-size: 15px; margin-bottom: 2px; }
+.msg b { color: var(--gold); font-weight: normal; }
+.msg code { background: var(--edge); color: var(--blue); padding: 0 3px; border-radius: 3px; font-family: inherit; }
+.msg.you { align-self: flex-end; background: #4a3a1a; border: 1px solid var(--gold-dark); }
+.msg.agent { align-self: flex-start; background: var(--panel-hi); }
+.msg.tool { align-self: flex-start; padding: 0 9px; color: var(--muted); font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.msg.note { align-self: center; color: var(--gold); font-size: 17px; }
+.thread .empty { color: var(--muted); margin: auto; }
+#ordersBox { display: none; margin-top: 8px; }
+#ordersBox.open { display: block; }
+#ordersInput { min-height: 56px; margin-top: 4px; width: 100%; resize: vertical; }
+#sheet.expanded #ordersInput { min-height: 72px; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { background: var(--edge); color: var(--cream); border: 1px solid var(--panel-hi); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-family: inherit; font-size: 17px; }
+.chip:hover { border-color: var(--gold); color: var(--gold); }
+.chip:disabled { opacity: .45; cursor: not-allowed; }
+.sheet-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 
 #board { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 24px)); max-height: 70vh; overflow: auto; display: none; }
 #board.open { display: block; }
@@ -179,12 +240,6 @@ canvas#world.dragging { cursor: grabbing; }
 .row-buttons { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.danger { background: #7a1d1d; }
-#ordersBox { display: none; margin-top: 8px; }
-#ordersBox.open { display: block; }
-#ordersInput { min-height: 56px; margin-top: 4px; }
-#replyBox { display: none; margin-bottom: 8px; }
-#replyBox.open { display: block; }
-#sheetReply { white-space: pre-wrap; max-height: 160px; overflow-y: auto; }
 .tag { display: inline-block; background: var(--edge); color: var(--blue); padding: 1px 6px; margin-top: 4px; line-height: 1; }
 
 #tooltip { position: fixed; pointer-events: none; display: none; padding: 6px 8px; font-size: 18px; line-height: 1; z-index: 5; max-width: 280px; }

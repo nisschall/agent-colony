@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { addEvent, agents, getAgent, markHuman, markInterrupted, projectPaths, shortTarget, touch } = require('./agents');
+const { addEvent, agents, getAgent, markHuman, markInterrupted, projectPaths, touch } = require('./agents');
 const { ApiError } = require('./api-error');
 const { ALLOWED_TOOLS, CLAUDE_BIN, MODELS, PORTAL_FILE } = require('./config');
 const { setProject } = require('./projects');
@@ -13,6 +13,7 @@ const { discover } = require('./scanner');
 const portalAgents = loadPortalAgents();
 const runningProcesses = new Map();
 const REPLY_LIMIT = 4000;
+const BLOCKED_LIMIT = 5;
 
 function loadPortalAgents() {
   try { return JSON.parse(fs.readFileSync(PORTAL_FILE, 'utf8')); } catch { return {}; }
@@ -29,7 +30,37 @@ function portalStatus(agent) {
   const running = runningProcesses.has(agent.id);
   const outcome = record.outcome;
   const current = !running && outcome && agent.lastHumanTs <= outcome.ts;
-  return { running, outcome: current ? outcome : null };
+  return { running, startedAt: record.startedAt || 0, outcome: current ? outcome : null };
+}
+
+const ABSOLUTE_PATH = /(?:^|[\s='"])((?:\/|~\/)[^\s'"`;|&<>()]+)/g;
+
+function isWithin(folder, root) {
+  const relative = path.relative(root, folder);
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+// Folders outside its own that an action names: Claude Code blocks those even when the action itself is allowed.
+function foldersOf(text, cwd) {
+  const folders = new Set();
+  for (const match of String(text).matchAll(ABSOLUTE_PATH)) {
+    const target = path.resolve(match[1].replace(/^~(?=\/)/, os.homedir()));
+    const isFolder = fs.statSync(target, { throwIfNoEntry: false })?.isDirectory();
+    const folder = isFolder ? target : path.dirname(target);
+    if (folder === path.parse(folder).root || folder.startsWith('/dev') || isWithin(folder, cwd)) continue;
+    folders.add(folder);
+  }
+  return [...folders];
+}
+
+// The exact permission a blocked action needs, so a retry allows that one action and nothing wider.
+function blockedAction(denial, cwd) {
+  const input = denial.tool_input || {};
+  if (denial.tool_name === 'Bash') return { text: input.command, rule: `Bash(${input.command})`, folders: foldersOf(input.command, cwd) };
+  if (input.file_path) {
+    return { text: `${denial.tool_name} ${input.file_path}`, rule: `${denial.tool_name}(/${input.file_path})`, folders: foldersOf(input.file_path, cwd) };
+  }
+  return { text: denial.tool_name, rule: denial.tool_name, folders: [] };
 }
 
 function firstSentence(text) {
@@ -42,10 +73,12 @@ function recordOutcome(agentId, output) {
   try { result = JSON.parse(output); } catch { return; }
   const reply = String(result.result || '').trim();
   const denials = result.permission_denials || [];
-  const blocked = [...new Set(denials.map((denial) => shortTarget(denial.tool_name, denial.tool_input)))].slice(0, 5);
+  const cwd = portalAgents[agentId].cwd;
+  const actions = new Map(denials.map((denial) => blockedAction(denial, cwd)).map((action) => [action.rule, action]));
+  const blocked = [...actions.values()].slice(0, BLOCKED_LIMIT);
   const question = reply.endsWith('?') ? reply.split(/(?<=[.!\n])\s+/).pop() : '';
   let summary = firstSentence(reply);
-  if (blocked.length) summary = `Blocked from ${blocked[0]}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}`;
+  if (blocked.length) summary = `Blocked from ${blocked[0].text.slice(0, 80)}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}`;
   else if (question) summary = question.slice(0, 160);
   const needsYou = Boolean(blocked.length || result.is_error || question);
   const outcome = { state: needsYou ? 'needs-you' : 'done', summary, reply: reply.slice(0, REPLY_LIMIT), blocked, ts: Date.now() };
@@ -59,6 +92,7 @@ function recordOutcome(agentId, output) {
 
 function runClaude(agentId, args, cwd) {
   delete portalAgents[agentId].outcome;
+  portalAgents[agentId].startedAt = Date.now();
   savePortalAgents();
   const child = spawn(CLAUDE_BIN, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
@@ -77,8 +111,9 @@ function runClaude(agentId, args, cwd) {
   });
 }
 
-function claudeArgs(prompt, model) {
-  return ['-p', prompt, '--model', model, '--output-format', 'json', '--permission-mode', 'acceptEdits', '--allowedTools', ALLOWED_TOOLS.join(',')];
+function claudeArgs(prompt, model, extraRules = []) {
+  const allowed = [...ALLOWED_TOOLS, ...extraRules].join(',');
+  return ['-p', prompt, '--model', model, '--output-format', 'json', '--permission-mode', 'acceptEdits', '--allowedTools', allowed];
 }
 
 function hireAgent({ project, model, brief }) {
@@ -144,14 +179,29 @@ function startAgent(cwd, model, brief) {
   return agentId;
 }
 
-function sendOrders(agentId, message) {
+function resumeWith(agentId, message, extraRules, extraFolders = []) {
   const record = portalAgents[agentId];
   if (!record) throw new ApiError(403, 'Only agents hired from the portal can take orders here. Reply to this one in the Claude app.');
   if (runningProcesses.has(agentId)) throw new ApiError(409, 'This agent is still working. Send orders once it finishes, or stop it first.');
+  markHuman(getAgent(agentId, 'claude'), Date.now());
+  const folderArgs = extraFolders.flatMap((folder) => ['--add-dir', folder]);
+  runClaude(agentId, [...claudeArgs(message, record.model, extraRules), ...folderArgs, '--resume', record.sessionId], record.cwd);
+}
+
+function sendOrders(agentId, message) {
   if (!message || !message.trim()) throw new ApiError(400, 'Write your orders first.');
-  const agent = getAgent(agentId, 'claude');
-  markHuman(agent, Date.now());
-  runClaude(agentId, [...claudeArgs(message, record.model), '--resume', record.sessionId], record.cwd);
+  resumeWith(agentId, message, []);
+}
+
+// Your approval for what its last run was blocked from, for one more run only.
+function retryBlocked(agentId) {
+  const blocked = portalAgents[agentId]?.outcome?.blocked;
+  if (!Array.isArray(blocked) || !blocked.length || typeof blocked[0] !== 'object') throw new ApiError(409, 'Nothing was blocked in its last run.');
+  const list = blocked.map((action) => `- ${action.text}`).join('\n');
+  const message = `You now have my approval for what was blocked, for this run only:\n${list}\nRun each one exactly as written, as its own call, then carry on with the task.`;
+  const folders = [...new Set(blocked.flatMap((action) => action.folders || []))];
+  resumeWith(agentId, message, blocked.map((action) => action.rule), folders);
+  console.log(`[portal] ${agentId} retrying ${blocked.length} blocked action(s)`);
 }
 
 function stopAgent(agentId) {
@@ -198,4 +248,4 @@ function openInTerminal(agentId) {
   });
 }
 
-module.exports = { portalAgents, runningProcesses, portalStatus, hireAgent, foundProject, sendOrders, stopAgent, openInTerminal };
+module.exports = { portalAgents, runningProcesses, portalStatus, hireAgent, foundProject, sendOrders, retryBlocked, stopAgent, openInTerminal };

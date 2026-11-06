@@ -20,7 +20,7 @@ function getAgent(id, kind) {
   let agent = agents.get(id);
   if (agent) return agent;
   agent = {
-    id, kind, parentId: null, project: 'unknown', cwd: '', title: '', model: '',
+    id, kind, parentId: null, project: 'unknown', cwd: '', title: '', model: '', logFile: '',
     firstTs: 0, lastTs: 0, streakStart: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, context: 0, cost: 0,
     toolCalls: 0, toolErrors: 0, edits: 0, linesAdded: 0, linesRemoved: 0,

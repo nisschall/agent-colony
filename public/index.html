@@ -50,38 +50,65 @@
 </div>
 
 <div id="sheet" class="panel">
-  <span class="close" id="sheetClose">X</span>
-  <div class="head">
-    <canvas id="portrait" width="24" height="24"></canvas>
-    <div>
-      <h2 id="sheetName">—</h2>
-      <div class="cls" id="sheetClass">—</div>
-      <div class="cls" id="sheetLevel">—</div>
-    </div>
+  <div class="sheet-tools">
+    <button class="icon-btn" id="sheetExpand" title="Expand to talk to this agent">⤢</button>
+    <button class="icon-btn" id="sheetClose" title="Close">✕</button>
   </div>
-  <div class="quest" id="sheetQuest"></div>
-  <div class="label" style="margin-top:8px">XP</div>
-  <div class="bar"><i id="sheetXp" style="width:0;background:var(--blue)"></i></div>
-  <div class="label" style="margin-top:6px">ENERGY</div>
-  <div class="bar" id="sheetEnergyBar"><i id="sheetEnergy" style="width:0"></i></div>
-  <div class="stats" id="sheetStats"></div>
-  <div class="label" style="margin-top:8px">CURRENTLY</div>
-  <div class="doing" id="sheetDoing"></div>
-  <div id="ordersBox">
+  <div id="sheetInfo">
+    <div class="head">
+      <canvas id="portrait" width="24" height="24"></canvas>
+      <div>
+        <h2 id="sheetName">—</h2>
+        <div class="cls" id="sheetClass">—</div>
+        <div class="cls" id="sheetLevel">—</div>
+      </div>
+    </div>
+    <div class="state-line" id="sheetState"></div>
+    <div class="label section">TASK</div>
+    <div class="task" id="sheetTask" title="Click to show all"></div>
+    <div class="stats" id="sheetStats"></div>
+    <button class="link" id="sheetMoreToggle">MORE STATS ▸</button>
+    <div id="sheetMore">
+      <div class="label section">XP</div>
+      <div class="bar"><i id="sheetXp" style="width:0;background:var(--blue)"></i></div>
+      <div class="label section">ENERGY</div>
+      <div class="bar" id="sheetEnergyBar"><i id="sheetEnergy" style="width:0"></i></div>
+      <div class="stats" id="sheetMoreStats"></div>
+    </div>
+    <div id="blockedBox">
+      <div class="label section">BLOCKED — NEEDS YOUR OK</div>
+      <ul class="blocked" id="blockedList"></ul>
+      <button class="btn" id="btnRetry" title="Re-run it with only these actions allowed, for one run">✓ ALLOW ONCE &amp; RETRY</button>
+    </div>
+    <div class="label section">ACTIVITY</div>
+    <ul class="activity" id="sheetActivity"></ul>
+    <div id="filesBox">
+      <div class="label section" id="filesLabel">FILES CHANGED</div>
+      <ul class="files" id="sheetFiles"></ul>
+    </div>
     <div id="replyBox">
-      <div class="label">ITS LAST REPLY</div>
-      <div class="doing" id="sheetReply"></div>
+      <div class="label section">ITS LAST REPLY</div>
+      <div class="reply" id="sheetReply"></div>
     </div>
-    <div class="label">GIVE ORDERS</div>
-    <textarea id="ordersInput" placeholder="Answer its question or give it the next task…"></textarea>
-    <div class="note" id="ordersNote"></div>
   </div>
-  <div class="note" id="watchOnlyNote"></div>
-  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-    <button class="btn" id="btnFollow">FOLLOW</button>
-    <button class="btn" id="btnOrders">SEND ORDERS</button>
-    <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal">💻 OPEN IN TERMINAL</button>
-    <button class="btn danger" id="btnStop">STOP</button>
+  <div id="sheetChat">
+    <div class="label">CONVERSATION</div>
+    <div class="thread" id="chatThread"></div>
+    <div id="ordersBox">
+      <div class="quick" id="quickReplies">
+        <button class="chip" data-reply="Go ahead.">Go ahead</button>
+        <button class="chip" data-reply="Stop here and summarise what you did and what is left.">Stop and summarise</button>
+      </div>
+      <textarea id="ordersInput" placeholder="Talk to it: answer its question or give the next task… (Enter sends, Shift+Enter for a new line)"></textarea>
+      <div class="note" id="ordersNote"></div>
+    </div>
+    <div class="note" id="watchOnlyNote"></div>
+    <div class="sheet-buttons">
+      <button class="btn" id="btnOrders">SEND</button>
+      <button class="btn" id="btnFollow">FOLLOW</button>
+      <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal">💻 TERMINAL</button>
+      <button class="btn danger" id="btnStop">STOP</button>
+    </div>
   </div>
 </div>
 

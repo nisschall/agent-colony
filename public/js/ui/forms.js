@@ -4,7 +4,8 @@ import { addToast } from '../hud.js';
 import { state } from '../state.js';
 import { money } from '../utils.js';
 
-export async function api(path, body) {
+// `quiet` skips the error toast, for requests that repeat on a timer.
+export async function api(path, body, quiet = false) {
   try {
     const response = await fetch(path, {
       method: 'POST',
@@ -12,10 +13,10 @@ export async function api(path, body) {
       body: JSON.stringify(body || {}),
     });
     const result = await response.json();
-    if (!result.ok) addToast(`⚠ ${result.message}`);
+    if (!result.ok && !quiet) addToast(`⚠ ${result.message}`);
     return result;
   } catch {
-    addToast('⚠ Could not reach the colony server');
+    if (!quiet) addToast('⚠ Could not reach the colony server');
     return { ok: false };
   }
 }

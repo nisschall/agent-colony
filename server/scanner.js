@@ -64,6 +64,7 @@ function registerFile(file) {
   } else {
     agent = getAgent(`claude:${path.basename(file, '.jsonl')}`, 'claude');
   }
+  agent.logFile = file;
   const handler = agent.kind === 'codex' ? (line) => handleCodexLine(agent, line) : (line) => handleClaudeLine(agent, line);
   files.set(file, { offset: 0, partial: '', handler });
 }
