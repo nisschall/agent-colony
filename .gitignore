@@ -1,0 +1,9 @@
+# Built wallpaper app (made by ./install-autostart.sh)
+build/
+
+# Local state written at runtime: hired agents and this Mac's town layout
+portal-agents.json
+town.json
+
+.DS_Store
+.claude/
