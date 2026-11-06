@@ -26,8 +26,8 @@ fi
 
 build_wallpaper_app() {
   mkdir -p "$WALLPAPER_APP/Contents/MacOS"
-  cp "$APP_DIR/wallpaper/Info.plist" "$WALLPAPER_APP/Contents/Info.plist"
-  swiftc -O -swift-version 5 "$APP_DIR/wallpaper/main.swift" -o "$WALLPAPER_APP/Contents/MacOS/ColonyWallpaper" \
+  cp "$APP_DIR/macos/Info.plist" "$WALLPAPER_APP/Contents/Info.plist"
+  swiftc -O -swift-version 5 "$APP_DIR/macos/main.swift" -o "$WALLPAPER_APP/Contents/MacOS/ColonyWallpaper" \
     -framework AppKit -framework WebKit -framework Carbon
   codesign --force -s - "$WALLPAPER_APP" >/dev/null 2>&1
 }
@@ -70,7 +70,7 @@ echo "Building Colony Wallpaper…"
 build_wallpaper_app
 
 # The server always restarts; the wallpaper restarts after a crash but stays closed if you choose Quit.
-write_agent "$SERVER_LABEL" "<true/>" "$NODE_BIN" "$APP_DIR/server.js"
+write_agent "$SERVER_LABEL" "<true/>" "$NODE_BIN" "$APP_DIR/server/index.js"
 write_agent "$WALLPAPER_LABEL" "<dict><key>SuccessfulExit</key><false/></dict>" "$WALLPAPER_APP/Contents/MacOS/ColonyWallpaper"
 
 echo "Agent Colony server and wallpaper now start at login."

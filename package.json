@@ -1,0 +1,12 @@
+{
+  "name": "agent-colony",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A live pixel town of the Claude Code and Codex agents on your Mac.",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

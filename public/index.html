@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Colony</title>
+<meta name="colony-token" content="__COLONY_TOKEN__">
+<meta name="colony-layout" content="__COLONY_LAYOUT__">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<div id="statusBar" class="panel" title="Click for details">
+  <span class="seg"><span class="coin" id="coin"></span><b id="treasuryAmount">$0.00</b><span class="dim">of <span id="budgetLabel">$50</span></span><span class="bar mini" id="budgetBar"><i style="width:0"></i></span></span>
+  <span class="seg" title="Working">⚒ <span id="popWorking">0</span></span>
+  <span class="seg" title="On a break">☕ <span id="popIdle">0</span></span>
+  <span class="seg" title="Asleep (quiet 45m+)">💤 <span id="popSleeping">0</span></span>
+  <span class="seg" title="Overworked" id="popHotWrap">🔥 <span id="popHot">0</span></span>
+  <span class="seg" title="Stuck (repeated errors)" id="popStuckWrap">❗ <span id="popStuck">0</span></span>
+  <span class="seg" title="Waiting on you — click to visit the first" id="popWaitWrap">🙋 <span id="popWait">0</span></span>
+  <span class="seg dim" id="clock">--:--</span>
+</div>
+
+<div id="statusDetails" class="panel">
+  <div class="detail"><span>Daily budget</span><span>$<input id="budgetInput" type="number" min="1" step="5"></span></div>
+  <div class="detail"><span>Last 30 days</span><b id="monthCost"></b></div>
+  <div class="detail"><span>Burn rate (10 min)</span><b id="popBurn">$0/h</b></div>
+  <div class="detail"><span>Lines changed today</span><b id="linesToday">0</b></div>
+  <div class="detail" id="popReviewWrap"><span>Focused on</span><b id="popReview">—</b></div>
+</div>
+
+<div id="chronicle" class="panel">
+  <button class="chev" id="chronicleToggle" title="Show more events">▴</button>
+  <div class="label">COLONY CHRONICLE</div>
+  <ul id="chronicleList"></ul>
+</div>
+
+<div id="toolbar" class="panel">
+  <button class="btn" id="btnCrew" title="Today's crew">🎖</button>
+  <button class="btn" id="btnFame" title="Hall of fame">🏆</button>
+  <button class="btn" id="btnWard" title="Burnout ward">🚑</button>
+  <button class="btn" id="btnPause" title="Pause animation">⏸</button>
+  <button class="btn" id="btnSpeed" title="Animation speed">1x</button>
+  <button class="btn" id="btnHome" title="Show the whole town">⌂</button>
+  <button class="btn" id="btnTime" title="Time of day: LIVE">⏰</button>
+  <button class="btn" id="btnRebuild" title="Rebuild the town with a new layout">🎲</button>
+</div>
+
+<div id="sheet" class="panel">
+  <span class="close" id="sheetClose">X</span>
+  <div class="head">
+    <canvas id="portrait" width="24" height="24"></canvas>
+    <div>
+      <h2 id="sheetName">—</h2>
+      <div class="cls" id="sheetClass">—</div>
+      <div class="cls" id="sheetLevel">—</div>
+    </div>
+  </div>
+  <div class="quest" id="sheetQuest"></div>
+  <div class="label" style="margin-top:8px">XP</div>
+  <div class="bar"><i id="sheetXp" style="width:0;background:var(--blue)"></i></div>
+  <div class="label" style="margin-top:6px">ENERGY</div>
+  <div class="bar" id="sheetEnergyBar"><i id="sheetEnergy" style="width:0"></i></div>
+  <div class="stats" id="sheetStats"></div>
+  <div class="label" style="margin-top:8px">CURRENTLY</div>
+  <div class="doing" id="sheetDoing"></div>
+  <div id="ordersBox">
+    <div class="label">GIVE ORDERS</div>
+    <textarea id="ordersInput" placeholder="Answer its question or give it the next task…"></textarea>
+    <div class="note" id="ordersNote"></div>
+  </div>
+  <div class="note" id="watchOnlyNote"></div>
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+    <button class="btn" id="btnFollow">FOLLOW</button>
+    <button class="btn" id="btnOrders">SEND ORDERS</button>
+    <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal">💻 OPEN IN TERMINAL</button>
+    <button class="btn danger" id="btnStop">STOP</button>
+  </div>
+</div>
+
+<div id="ctxMenu" class="panel">
+  <div class="label" id="ctxTitle"></div>
+  <button class="btn" id="ctxHire">🧑‍🔧 HIRE AGENT HERE</button>
+  <button class="btn" id="ctxZoom">🔍 ZOOM IN</button>
+</div>
+
+<div id="groundMenu" class="panel">
+  <button class="btn" id="groundFound">✨ NEW APP / NEW CHAT</button>
+</div>
+
+<div id="hire" class="panel">
+  <span class="close" id="hireClose">X</span>
+  <h2 id="hireTitle">HIRE AN AGENT</h2>
+  <div class="note" id="hirePath"></div>
+  <div id="whereBlock">
+    <div class="field">
+      <div class="label">START</div>
+      <select id="foundMode">
+        <option value="new">A new app (creates a new folder)</option>
+        <option value="existing">A new chat in an existing folder</option>
+      </select>
+    </div>
+    <div id="newFields">
+      <div class="field"><div class="label">APP NAME</div><input id="foundName" placeholder="my-new-app"></div>
+      <div class="field"><div class="label">CREATE INSIDE</div><input id="foundParent"></div>
+    </div>
+    <div class="field" id="existingFields"><div class="label">FOLDER</div><input id="foundFolder" placeholder="/Users/you/Documents/Projects/some-app"></div>
+  </div>
+  <div class="field">
+    <div class="label">CLASS</div>
+    <select id="hireModel">
+      <option value="opus">Opus — Architect (most capable)</option>
+      <option value="sonnet">Sonnet — Builder (balanced)</option>
+      <option value="haiku">Haiku — Runner (fast, cheap)</option>
+    </select>
+  </div>
+  <div class="field">
+    <div class="label">QUEST BRIEF</div>
+    <textarea id="hireBrief" placeholder="What should this agent do? e.g. Add unit tests for the connector factory"></textarea>
+  </div>
+  <div class="note">It may edit files in this project and run read-only, build and test commands (git status/diff/log, npm test/build, mvnw compile/test, gradlew build/test). Anything else is refused and it will ask you instead.</div>
+  <div class="note warn" id="hireBudget"></div>
+  <div class="row-buttons">
+    <button class="btn" id="hireCancel">CANCEL</button>
+    <button class="btn" id="hireGo">🧑‍🔧 HIRE</button>
+  </div>
+</div>
+
+<div id="board" class="panel">
+  <span class="close" id="boardClose">X</span>
+  <h2 id="boardTitle"></h2>
+  <div id="boardBody"></div>
+</div>
+
+<div id="crew" class="panel">
+  <span class="close" id="crewClose">X</span>
+  <h2 id="crewTitle">🎖 TODAY'S CREW</h2>
+  <div class="crew-summary" id="crewSummary"></div>
+  <div class="crew-grid" id="crewGrid"></div>
+</div>
+
+<div id="toasts"></div>
+<div id="tooltip" class="panel"></div>
+
+<div id="loading">
+  <div class="px">AGENT COLONY</div>
+  <div>Surveying the land<span class="dots"></span></div>
+  <div id="loadingHint" style="color:var(--muted)">Reading agent logs from ~/.claude and ~/.codex</div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
