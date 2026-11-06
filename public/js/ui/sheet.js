@@ -2,6 +2,7 @@
 import { addToast, autonomy, statusLabel } from '../hud.js';
 import { efficiency, levelOf, levelProgress, prettyModel, xpOf } from '../identity.js';
 import { HIRED_MARK, drawPerson } from '../people.js';
+import { sendAway } from '../simulation.js';
 import { state } from '../state.js';
 import { api } from '../ui/forms.js';
 import { clockTime, compact, duration, escapeHtml, money } from '../utils.js';
@@ -10,6 +11,8 @@ const DETAILS_REFRESH_MS = 3000;
 const COMPACT_ACTIVITY = 5;
 const COMPACT_FILES = 6;
 const WATCH_ONLY = 'Watch-only: this agent lives in the Claude app, so reply to it there.';
+const RELEASE_CONFIRM_MS = 4000;
+const RELEASE_LABEL = '👋 RELEASE';
 
 const sheet = document.getElementById('sheet');
 const thread = document.getElementById('chatThread');
@@ -18,6 +21,7 @@ const ordersInput = document.getElementById('ordersInput');
 let details = null;
 let threadKey = '';
 let showMoreStats = false;
+let releaseArmedUntil = 0;
 
 function isExpanded() {
   return sheet.classList.contains('expanded');
@@ -210,6 +214,7 @@ function renderOrdersBox(agent) {
   document.getElementById('btnOrders').style.display = portal ? '' : 'none';
   document.getElementById('btnTerminal').style.display = portal ? '' : 'none';
   document.getElementById('btnStop').style.display = running ? '' : 'none';
+  document.getElementById('btnRelease').style.display = portal ? '' : 'none';
   document.getElementById('watchOnlyNote').textContent = portal ? '' : WATCH_ONLY;
   document.getElementById('replyBox').classList.toggle('open', Boolean(outcome && outcome.reply));
   if (!portal) return;
@@ -274,6 +279,34 @@ document.getElementById('btnStop').onclick = async () => {
   if (!state.selectedId) return;
   const result = await api(`/api/agents/${encodeURIComponent(state.selectedId)}/stop`);
   if (result.ok) addToast('✋ Agent stopped', 'info');
+};
+
+// Release asks for a second click instead of a dialog: the wallpaper's web view doesn't show confirm() boxes.
+document.getElementById('btnRelease').onclick = async (e) => {
+  const button = e.currentTarget;
+  const agentId = state.selectedId;
+  if (!agentId) return;
+  if (Date.now() > releaseArmedUntil) {
+    const worker = state.workers.get(agentId);
+    const running = worker && worker.agent.portal && worker.agent.portal.running;
+    releaseArmedUntil = Date.now() + RELEASE_CONFIRM_MS;
+    button.textContent = running ? 'STOP IT AND RELEASE?' : 'CLICK AGAIN TO RELEASE';
+    button.classList.add('danger');
+    setTimeout(() => {
+      button.textContent = RELEASE_LABEL;
+      button.classList.remove('danger');
+    }, RELEASE_CONFIRM_MS);
+    return;
+  }
+  releaseArmedUntil = 0;
+  button.textContent = RELEASE_LABEL;
+  button.classList.remove('danger');
+  const result = await api(`/api/agents/${encodeURIComponent(agentId)}/release`);
+  if (!result.ok) return;
+  const name = state.workers.get(agentId)?.look.name || 'The agent';
+  sendAway(agentId);
+  closeSheet();
+  addToast(`👋 ${name} was released. Its conversation stays in Claude's history.`, 'info');
 };
 
 document.getElementById('sheetTask').onclick = (e) => e.currentTarget.classList.toggle('full');

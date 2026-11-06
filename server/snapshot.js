@@ -1,7 +1,7 @@
 // The colony state sent to every open page.
 const { agents, dailyCost, dailyLines, dayKey, events, projectPaths, statusOf, stressOf } = require('./agents');
 const { DEFAULT_PROJECTS_FOLDER, HISTORY_DAYS, MIN } = require('./config');
-const { portalStatus } = require('./portal');
+const { isReleased, portalStatus } = require('./portal');
 const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects');
 const { currentTownSeed } = require('./town');
 
@@ -83,7 +83,7 @@ function snapshot(ready) {
     tallyWork(projects, agent, home, today, weekKeys, now);
     if (agent.lastTs >= home.lastTs && agent.cwd) home.path = agent.cwd;
     home.lastTs = Math.max(home.lastTs, agent.lastTs);
-    if (now - agent.lastTs > 24 * 60 * MIN) continue;
+    if (now - agent.lastTs > 24 * 60 * MIN || isReleased(agent.id)) continue;
     const stress = stressOf(agent, now);
     let status = statusOf(agent, now, stress);
     let { waitingAsk, waitingSince } = agent;

@@ -23,9 +23,19 @@ function savePortalAgents() {
   fs.writeFileSync(PORTAL_FILE, JSON.stringify(portalAgents, null, 2));
 }
 
+// A released agent's record is kept (marked released) so it never comes back as a watch-only agent.
+function hiredRecord(agentId) {
+  const record = portalAgents[agentId];
+  return record && !record.released ? record : null;
+}
+
+function isReleased(agentId) {
+  return Boolean(portalAgents[agentId]?.released);
+}
+
 // A run's outcome stops counting once you talk to the agent again (here, or in Terminal).
 function portalStatus(agent) {
-  const record = portalAgents[agent.id];
+  const record = hiredRecord(agent.id);
   if (!record) return null;
   const running = runningProcesses.has(agent.id);
   const outcome = record.outcome;
@@ -69,6 +79,7 @@ function firstSentence(text) {
 
 // A hired agent can't show you an approval prompt: a blocked action, an error or a closing question means it needs you.
 function recordOutcome(agentId, output) {
+  if (!hiredRecord(agentId)) return;
   let result;
   try { result = JSON.parse(output); } catch { return; }
   const reply = String(result.result || '').trim();
@@ -180,7 +191,7 @@ function startAgent(cwd, model, brief) {
 }
 
 function resumeWith(agentId, message, extraRules, extraFolders = []) {
-  const record = portalAgents[agentId];
+  const record = hiredRecord(agentId);
   if (!record) throw new ApiError(403, 'Only agents hired from the portal can take orders here. Reply to this one in the Claude app.');
   if (runningProcesses.has(agentId)) throw new ApiError(409, 'This agent is still working. Send orders once it finishes, or stop it first.');
   markHuman(getAgent(agentId, 'claude'), Date.now());
@@ -195,7 +206,7 @@ function sendOrders(agentId, message) {
 
 // Your approval for what its last run was blocked from, for one more run only.
 function retryBlocked(agentId) {
-  const blocked = portalAgents[agentId]?.outcome?.blocked;
+  const blocked = hiredRecord(agentId)?.outcome?.blocked;
   if (!Array.isArray(blocked) || !blocked.length || typeof blocked[0] !== 'object') throw new ApiError(409, 'Nothing was blocked in its last run.');
   const list = blocked.map((action) => `- ${action.text}`).join('\n');
   const message = `You now have my approval for what was blocked, for this run only:\n${list}\nRun each one exactly as written, as its own call, then carry on with the task.`;
@@ -204,13 +215,30 @@ function retryBlocked(agentId) {
   console.log(`[portal] ${agentId} retrying ${blocked.length} blocked action(s)`);
 }
 
-function stopAgent(agentId) {
-  const child = runningProcesses.get(agentId);
-  if (!portalAgents[agentId]) throw new ApiError(403, 'Only agents hired from the portal can be stopped here.');
-  if (!child) throw new ApiError(409, 'This agent is not running.');
+function killRun(agentId, child) {
   child.kill('SIGINT');
   setTimeout(() => { if (runningProcesses.get(agentId) === child) child.kill('SIGTERM'); }, 5000);
+}
+
+function stopAgent(agentId) {
+  const child = runningProcesses.get(agentId);
+  if (!hiredRecord(agentId)) throw new ApiError(403, 'Only agents hired from the portal can be stopped here.');
+  if (!child) throw new ApiError(409, 'This agent is not running.');
+  killRun(agentId, child);
   markInterrupted(getAgent(agentId, 'claude'), Date.now());
+}
+
+// Sends a hired agent out of town for good, stopping it first if it is still working.
+// Its conversation stays in Claude's history and its cost stays in the totals.
+function releaseAgent(agentId) {
+  const record = hiredRecord(agentId);
+  if (!record) throw new ApiError(403, 'Only agents hired from the town can be released.');
+  const child = runningProcesses.get(agentId);
+  if (child) killRun(agentId, child);
+  record.released = true;
+  record.releasedAt = Date.now();
+  savePortalAgents();
+  console.log(`[portal] released ${agentId}`);
 }
 
 const SESSION_ID = /^[0-9a-f-]{36}$/;
@@ -222,7 +250,7 @@ function shellQuote(text) {
 
 // Opens a hired agent's own Claude session in Terminal, so you can talk to it directly instead of through the town.
 function openInTerminal(agentId) {
-  const record = portalAgents[agentId];
+  const record = hiredRecord(agentId);
   if (!record) throw new ApiError(403, 'Only agents hired from the town can be opened in Terminal.');
   if (runningProcesses.has(agentId)) throw new ApiError(409, 'This agent is still working. Open it once it finishes, or stop it first.');
   if (!SESSION_ID.test(record.sessionId)) throw new ApiError(400, 'This agent has no valid session to open.');
@@ -248,4 +276,4 @@ function openInTerminal(agentId) {
   });
 }
 
-module.exports = { portalAgents, runningProcesses, portalStatus, hireAgent, foundProject, sendOrders, retryBlocked, stopAgent, openInTerminal };
+module.exports = { portalAgents, runningProcesses, portalStatus, isReleased, hireAgent, foundProject, sendOrders, retryBlocked, stopAgent, releaseAgent, openInTerminal };

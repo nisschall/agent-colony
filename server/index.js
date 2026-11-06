@@ -7,7 +7,7 @@ const { agents } = require('./agents');
 const { ApiError } = require('./api-error');
 const { API_TOKEN, PORT, PUBLIC_DIR } = require('./config');
 const { conversationOf } = require('./conversation');
-const { foundProject, hireAgent, openInTerminal, retryBlocked, sendOrders, stopAgent } = require('./portal');
+const { foundProject, hireAgent, openInTerminal, releaseAgent, retryBlocked, sendOrders, stopAgent } = require('./portal');
 const { discover, files, poll } = require('./scanner');
 const { snapshot } = require('./snapshot');
 const { currentTownSeed, rebuildTown } = require('./town');
@@ -61,7 +61,7 @@ async function handleApi(req, res) {
     broadcast();
     return sendJson(res, 200, { ok: true, message: 'Town rebuilt.' });
   }
-  const match = req.url.match(/^\/api\/agents\/([^/]+)\/(orders|retry|stop|terminal|conversation)$/);
+  const match = req.url.match(/^\/api\/agents\/([^/]+)\/(orders|retry|stop|release|terminal|conversation)$/);
   if (!match) throw new ApiError(404, 'Unknown endpoint.');
   const agentId = decodeURIComponent(match[1]);
   const action = match[2];
@@ -72,12 +72,13 @@ async function handleApi(req, res) {
   if (action === 'conversation') return sendJson(res, 200, { ok: true, message: '', agentId, ...conversationOf(agentId) });
   if (action === 'orders') sendOrders(agentId, body.message);
   else if (action === 'retry') retryBlocked(agentId);
+  else if (action === 'release') releaseAgent(agentId);
   else stopAgent(agentId);
   broadcast();
   return sendJson(res, 200, { ok: true, message: ACTION_MESSAGES[action], agentId });
 }
 
-const ACTION_MESSAGES = { orders: 'Orders sent.', retry: 'Retrying with your approval.', stop: 'Agent stopped.' };
+const ACTION_MESSAGES = { orders: 'Orders sent.', retry: 'Retrying with your approval.', stop: 'Agent stopped.', release: 'Agent released.' };
 
 const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 

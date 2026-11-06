@@ -1,6 +1,6 @@
 // Moving agents: where each one should be, walking there, and you following your focus.
 import { IDLE_WANDER_CHANCE, PARK_ACTIVITIES, foodTruckOpen, updateAmbient } from './ambient.js';
-import { CODE_GLYPHS, FOUNTAIN, PARK, WALK_SPEED } from './config.js';
+import { CODE_GLYPHS, FOUNTAIN, MAP_W, PARK, ROAD_ROWS, TILE, WALK_SPEED } from './config.js';
 import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU } from './layout.js';
 import { BENCHES } from './scenery.js';
 import { state } from './state.js';
@@ -93,8 +93,43 @@ export function directionOf(dx, dy) {
   return dy < 0 ? 'up' : 'down';
 }
 
+const LEAVE_SPEED = 3;
+
+export function sendAway(agentId) {
+  const worker = state.workers.get(agentId);
+  if (!worker) return;
+  const roadY = nearestRoadY(worker.y);
+  worker.leaving = [{ x: worker.x, y: roadY }, { x: MAP_W * TILE + TILE, y: roadY }];
+  worker.target = worker.leaving.shift();
+}
+
+function nearestRoadY(y) {
+  const roads = ROAD_ROWS.map((row) => row * TILE + TILE / 2);
+  return roads.reduce((best, road) => (Math.abs(road - y) < Math.abs(best - y) ? road : best));
+}
+
+function walkAway(worker, dt) {
+  const dx = worker.target.x - worker.x;
+  const dy = worker.target.y - worker.y;
+  const distance = Math.hypot(dx, dy);
+  worker.moving = distance > 1;
+  if (worker.moving) {
+    const step = Math.min(distance, WALK_SPEED * LEAVE_SPEED * dt);
+    worker.x += (dx / distance) * step;
+    worker.y += (dy / distance) * step;
+    worker.dir = directionOf(dx, dy);
+    return;
+  }
+  if (worker.leaving.length) worker.target = worker.leaving.shift();
+  else state.workers.delete(worker.agent.id);
+}
+
 function updateWorker(worker, dt) {
   const agent = worker.agent;
+  if (worker.leaving) {
+    walkAway(worker, dt);
+    return;
+  }
   worker.phase += dt;
   worker.shake = Math.max(0, worker.shake - dt);
   const busy = ['working', 'overworked', 'stuck'].includes(agent.status);

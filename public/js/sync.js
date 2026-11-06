@@ -80,6 +80,7 @@ function onSnapshot(data) {
   for (const agent of data.agents) {
     live.add(agent.id);
     let worker = state.workers.get(agent.id);
+    if (worker && worker.leaving) continue;
     if (!worker) {
       const start = spawnPoint(agent);
       worker = { agent, look: identity(agent), x: start.x, y: start.y, target: null, wait: 0, phase: Math.random() * 10, shake: 0 };
@@ -99,7 +100,7 @@ function onSnapshot(data) {
     }
   }
   for (const id of [...state.workers.keys()]) {
-    if (!live.has(id)) state.workers.delete(id);
+    if (!live.has(id) && !state.workers.get(id).leaving) state.workers.delete(id);
   }
   if (first) YOU.snap = true;
   ingestEvents(data.events, first);
