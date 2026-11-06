@@ -1,5 +1,6 @@
 // Project folders: names, stack, size and features, and which part of a project a file belongs to.
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { MIN } = require('./config');
 
@@ -173,8 +174,45 @@ function layerOf(agent, file) {
   return match ? match[0] : '';
 }
 
+const MAX_LEVELS_UP = 6;
+const rootCache = new Map();
+
+// The folder a session belongs to. Worktrees fold into their repo, and a subfolder (say src/main/java) into the
+// nearest folder above it with .git, or failing that a build file. Never climbs to or past the home folder.
 function projectRoot(cwd) {
-  return cwd.split('/.claude/worktrees/')[0];
+  const base = cwd.split('/.claude/worktrees/')[0];
+  if (rootCache.has(base)) return rootCache.get(base);
+  const root = nearestWith(base, ['.git']) || nearestWith(base, PROJECT_MANIFESTS) || base;
+  rootCache.set(base, root);
+  return root;
+}
+
+function nearestWith(start, markers) {
+  const home = os.homedir() + path.sep;
+  let dir = start;
+  for (let level = 0; level <= MAX_LEVELS_UP && dir.startsWith(home); level++) {
+    const current = dir;
+    if (markers.some((marker) => fs.existsSync(path.join(current, marker)))) return current;
+    dir = path.dirname(dir);
+  }
+  return '';
+}
+
+const fileRootCache = new Map();
+
+// The project a file lives in: the nearest folder above it with .git, or failing that a build file.
+// Empty when it has neither (scratch files, ~/.claude notes), so the edit stays with the session's own project.
+function fileProjectRoot(file) {
+  const dir = path.dirname(file.replace(/\/\.claude\/worktrees\/[^/]+/, ''));
+  if (fileRootCache.has(dir)) return fileRootCache.get(dir);
+  const root = nearestWith(dir, ['.git']) || nearestWith(dir, PROJECT_MANIFESTS);
+  fileRootCache.set(dir, root);
+  return root;
+}
+
+// Folders the Claude app keeps for itself (not scratch chats) never get a building.
+function isAppInternal(cwd) {
+  return cwd.includes('/Library/Application Support/Claude/') && !cwd.includes('/scratch-workspaces/');
 }
 
 function projectName(cwd) {
@@ -189,4 +227,4 @@ function setProject(agent, cwd) {
   agent.cwd = projectRoot(cwd);
 }
 
-module.exports = { stackOf, profileOf, LIVE_LAYER_MS, layerOf, setProject };
+module.exports = { stackOf, profileOf, LIVE_LAYER_MS, layerOf, setProject, isAppInternal, fileProjectRoot, projectName };

@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { addEvent, agents, getAgent, markHuman, markInterrupted, touch } = require('./agents');
+const { addEvent, agents, getAgent, markHuman, markInterrupted, projectPaths, touch } = require('./agents');
 const { ApiError } = require('./api-error');
 const { ALLOWED_TOOLS, CLAUDE_BIN, MODELS, PORTAL_FILE } = require('./config');
 const { setProject } = require('./projects');
@@ -46,7 +46,9 @@ function claudeArgs(prompt, model) {
 }
 
 function hireAgent({ project, model, brief }) {
-  const cwd = [...agents.values()].filter((a) => a.project === project && a.cwd).sort((a, b) => b.lastTs - a.lastTs)[0]?.cwd;
+  const latestSession = [...agents.values()].filter((a) => a.project === project && a.cwd).sort((a, b) => b.lastTs - a.lastTs)[0];
+  // A project known only from edits made by sessions elsewhere still has a folder.
+  const cwd = latestSession ? latestSession.cwd : projectPaths.get(project);
   if (!cwd || !fs.existsSync(cwd)) throw new ApiError(400, `No folder known for project "${project}".`);
   return startAgent(cwd, model, brief);
 }

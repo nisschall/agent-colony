@@ -10,7 +10,7 @@ import { state } from './state.js';
 import { toggleCrew } from './ui/boards.js';
 import { closeBuildingMenu, closeHireForm, openBuildingMenu, openGroundMenu } from './ui/forms.js';
 import { closeSheet, selectWorker } from './ui/sheet.js';
-import { compact, escapeHtml, money } from './utils.js';
+import { compact, escapeHtml, money, siteOf } from './utils.js';
 
 let drag = null;
 
@@ -122,7 +122,7 @@ function updateHover(sx, sy) {
   let html;
   if (hit.type === 'worker') {
     const a = hit.worker.agent;
-    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status)} · ${escapeHtml(a.project)}<br>${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
+    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status)} · ${escapeHtml(a.project)}${siteOf(a) !== a.project ? ` → working on ${escapeHtml(siteOf(a))}` : ''}<br>${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
     if (a.status === 'waiting') html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
   } else {

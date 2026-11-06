@@ -8,7 +8,7 @@ import { targetFor } from './simulation.js';
 import { state } from './state.js';
 import { BUSY_STATUSES } from './ui/boards.js';
 import { renderSheet, selectWorker } from './ui/sheet.js';
-import { hash, money, pick } from './utils.js';
+import { hash, money, pick, siteOf } from './utils.js';
 import { sendDeliveryVan } from './visitors.js';
 
 // Buildings keep their lot across reloads (remembered per browser) so the town layout stays familiar.
@@ -63,7 +63,7 @@ function syncBuildings(projects) {
 }
 
 function spawnPoint(agent) {
-  const building = state.buildings.get(agent.project);
+  const building = state.buildings.get(siteOf(agent));
   if (building) return { x: building.x, y: building.y + 4 };
   return { x: FOUNTAIN.x, y: PARK.y1 };
 }
@@ -117,7 +117,7 @@ function reactToChanges(worker, before, after) {
   const linesAfter = after.linesAdded + after.linesRemoved;
   if (linesAfter > linesBefore) launchBrick(worker, after.linesAdded - before.linesAdded, after.linesRemoved - before.linesRemoved);
   const finishedTask = BUSY_STATUSES.includes(before.status) && ['waiting', 'idle'].includes(after.status);
-  if (finishedTask) sendDeliveryVan(state.buildings.get(after.project));
+  if (finishedTask) sendDeliveryVan(state.buildings.get(siteOf(after)));
   const spent = after.cost - before.cost;
   if (spent >= 0.01) {
     addFloater(worker.x, worker.y - 22, `-${money(spent)}`, '#ffcc33');
@@ -148,7 +148,7 @@ function reactToChanges(worker, before, after) {
 }
 
 function launchBrick(worker, added, removed) {
-  const building = state.buildings.get(worker.agent.project);
+  const building = state.buildings.get(siteOf(worker.agent));
   if (!building) return;
   const count = Math.min(6, 1 + Math.floor((added + removed) / 40));
   for (let i = 0; i < count; i++) {

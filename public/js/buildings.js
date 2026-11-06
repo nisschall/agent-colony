@@ -3,7 +3,7 @@ import { OUTLINE, ctx, rect, shade } from './canvas.js';
 import { BUILDING_W, FLOOR_H, MAX_FLOORS } from './config.js';
 import { currentHour, daylight, drawSunShadow } from './lighting.js';
 import { state } from './state.js';
-import { hash, seeded } from './utils.js';
+import { hash, seeded, siteOf } from './utils.js';
 
 export const TIERS = {
   cottage: { label: 'Cottage', article: 'a', w: 56, floors: [1, 1] },
@@ -363,7 +363,7 @@ function drawScaffolding(x, top, w) {
 }
 
 function drawWorkbenches(b) {
-  const crew = state.data.agents.filter((a) => a.project === b.name && ['working', 'overworked', 'stuck'].includes(a.status)).length;
+  const crew = state.data.agents.filter((a) => siteOf(a) === b.name && ['working', 'overworked', 'stuck'].includes(a.status)).length;
   for (let i = 0; i < Math.min(crew, 5); i++) {
     const bx = b.x - 40 + i * 20;
     const by = b.y + 10;

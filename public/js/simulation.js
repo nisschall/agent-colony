@@ -5,13 +5,14 @@ import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU } 
 import { BENCHES } from './scenery.js';
 import { state } from './state.js';
 import { addFloater } from './sync.js';
-import { hash } from './utils.js';
+import { hash, siteOf } from './utils.js';
 
 function workSpot(worker, data) {
-  const building = state.buildings.get(worker.agent.project);
+  const site = siteOf(worker.agent);
+  const building = state.buildings.get(site);
   if (!building) return parkSpot(worker);
   const crew = data.agents
-    .filter((a) => a.project === worker.agent.project && ['working', 'overworked', 'stuck'].includes(a.status))
+    .filter((a) => siteOf(a) === site && ['working', 'overworked', 'stuck'].includes(a.status))
     .map((a) => a.id)
     .sort();
   const slot = Math.max(0, crew.indexOf(worker.agent.id));
@@ -115,7 +116,7 @@ function updateWorker(worker, dt) {
   }
   if (busy) {
     if (Math.random() < dt * 0.5) {
-      const building = state.buildings.get(agent.project);
+      const building = state.buildings.get(siteOf(agent));
       if (building && agent.status !== 'stuck') {
         state.particles.push({ kind: 'spark', glyph: CODE_GLYPHS[Math.floor(Math.random() * CODE_GLYPHS.length)], sx: worker.x, sy: worker.y - 12, ex: worker.x + (Math.random() * 20 - 10), ey: worker.y - 34, t: 0, dur: 0.8 });
       }

@@ -61,6 +61,11 @@ export function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// The building an agent is at: the project it is editing right now, else the one its session belongs to.
+export function siteOf(agent) {
+  return agent.workProject || agent.project;
+}
+
 export function weightedPick(list, roll) {
   const total = list.reduce((sum, item) => sum + item.weight, 0);
   let running = 0;

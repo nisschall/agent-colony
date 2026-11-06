@@ -1,29 +1,88 @@
 // The colony state sent to every open page.
-const { agents, dailyCost, dailyLines, dayKey, events, statusOf, stressOf } = require('./agents');
+const { agents, dailyCost, dailyLines, dayKey, events, projectPaths, statusOf, stressOf } = require('./agents');
 const { DEFAULT_PROJECTS_FOLDER, HISTORY_DAYS, MIN } = require('./config');
 const { portalAgents, portalStatus, runningProcesses } = require('./portal');
-const { LIVE_LAYER_MS, profileOf, stackOf } = require('./projects');
+const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects');
 const { currentTownSeed } = require('./town');
+
+const BUILDING_PLOTS = 12;
+const IMPORTANCE_DAYS = 7;
+// One message from you counts like ten minutes of agent work: projects you are engaged with matter more.
+const MESSAGE_WEIGHT = 10;
+
+function recentDayKeys(now) {
+  return Array.from({ length: IMPORTANCE_DAYS }, (_, i) => dayKey(now - i * 24 * 60 * MIN));
+}
+
+// An agent stands at the building of the project it edited in the last quarter hour, else at its own.
+const WORK_HERE_MS = 15 * MIN;
+
+function projectEntry(projects, name) {
+  let project = projects.get(name);
+  if (!project) {
+    project = { name, path: '', lines: 0, linesToday: 0, cost: 0, agents: 0, active: 0, errors: 0, lastTs: 0, weekScore: 0, layers: [] };
+    projects.set(name, project);
+  }
+  return project;
+}
+
+// Lines, this week's work and live edits go to the project each edit touched; the rest stays with the agent's own.
+function tallyWork(projects, agent, home, today, weekKeys, now) {
+  let creditedLines = 0;
+  for (const [name, credit] of agent.credited) {
+    const project = projectEntry(projects, name);
+    project.lines += credit.lines;
+    project.lastTs = Math.max(project.lastTs, credit.lastTs);
+    project.path = project.path || projectPaths.get(name);
+    creditedLines += credit.lines;
+  }
+  home.lines += agent.linesAdded + agent.linesRemoved - creditedLines;
+
+  const todayStats = agent.daily.get(today);
+  let creditedToday = 0;
+  for (const [name, day] of todayStats ? todayStats.projects : []) {
+    projectEntry(projects, name).linesToday += day.lines;
+    creditedToday += day.lines;
+  }
+  home.linesToday += (todayStats ? todayStats.lines : 0) - creditedToday;
+
+  for (const key of weekKeys) {
+    const day = agent.daily.get(key);
+    if (!day) continue;
+    let movedMinutes = 0;
+    for (const [name, credit] of day.projects) {
+      projectEntry(projects, name).weekScore += credit.minutes.size;
+      movedMinutes += credit.minutes.size;
+    }
+    home.weekScore += Math.max(0, day.minutes.size - movedMinutes) + day.humanMsgs * MESSAGE_WEIGHT;
+  }
+
+  for (const [layer, edit] of Object.entries(agent.layerTs)) {
+    const project = edit.project ? projectEntry(projects, edit.project) : home;
+    if (now - edit.ts < LIVE_LAYER_MS && !project.layers.includes(layer)) project.layers.push(layer);
+  }
+}
+
+// Plots go first to projects with an agent working or waiting now, then to this week's busiest, then the most recent.
+function byImportance(a, b) {
+  const liveFirst = (b.active > 0) - (a.active > 0);
+  return liveFirst || b.weekScore - a.weekScore || b.lastTs - a.lastTs;
+}
 
 // `ready` is false until the first full scan of the logs has finished.
 function snapshot(ready) {
   const now = Date.now();
   const today = dayKey(now);
+  const weekKeys = recentDayKeys(now);
   const projects = new Map();
   const roster = [];
   for (const agent of agents.values()) {
     if (!agent.lastTs) continue;
-    const project = projects.get(agent.project)
-      || { name: agent.project, path: '', lines: 0, linesToday: 0, cost: 0, agents: 0, active: 0, errors: 0, lastTs: 0, layers: [] };
-    project.lines += agent.linesAdded + agent.linesRemoved;
-    project.linesToday += agent.daily.get(today)?.lines || 0;
-    project.cost += agent.cost;
-    for (const [layer, ts] of Object.entries(agent.layerTs)) {
-      if (now - ts < LIVE_LAYER_MS && !project.layers.includes(layer)) project.layers.push(layer);
-    }
-    if (agent.lastTs >= project.lastTs && agent.cwd) project.path = agent.cwd;
-    project.lastTs = Math.max(project.lastTs, agent.lastTs);
-    projects.set(agent.project, project);
+    const home = projectEntry(projects, agent.project);
+    home.cost += agent.cost;
+    tallyWork(projects, agent, home, today, weekKeys, now);
+    if (agent.lastTs >= home.lastTs && agent.cwd) home.path = agent.cwd;
+    home.lastTs = Math.max(home.lastTs, agent.lastTs);
     if (now - agent.lastTs > 24 * 60 * MIN) continue;
     const stress = stressOf(agent, now);
     let status = statusOf(agent, now, stress);
@@ -33,9 +92,12 @@ function snapshot(ready) {
       if (running && (status === 'idle' || status === 'sleeping' || status === 'waiting')) status = 'working';
       if (!running && ['working', 'overworked', 'stuck'].includes(status)) status = 'idle';
     }
-    project.agents += 1;
-    project.errors += stress.recentErrors;
-    if (status !== 'sleeping' && status !== 'idle') project.active += 1;
+    const workingRecently = agent.workProject && now - agent.workProjectTs < WORK_HERE_MS;
+    const workProject = workingRecently ? agent.workProject : agent.project;
+    const here = projectEntry(projects, workProject);
+    here.agents += 1;
+    here.errors += stress.recentErrors;
+    if (status !== 'sleeping' && status !== 'idle') here.active += 1;
     const todayStats = agent.daily.get(today);
     const todaySummary = todayStats && {
       cost: todayStats.cost, lines: todayStats.lines, edits: todayStats.edits, humanMsgs: todayStats.humanMsgs,
@@ -43,7 +105,7 @@ function snapshot(ready) {
     };
     roster.push({
       today: todaySummary || null,
-      id: agent.id, kind: agent.kind, parentId: agent.parentId, project: agent.project,
+      id: agent.id, kind: agent.kind, parentId: agent.parentId, project: agent.project, workProject,
       title: agent.title, model: agent.model, firstTs: agent.firstTs, lastTs: agent.lastTs,
       tokens: agent.tokens, context: agent.context, cost: agent.cost,
       toolCalls: agent.toolCalls, toolErrors: agent.toolErrors, edits: agent.edits,
@@ -55,7 +117,10 @@ function snapshot(ready) {
       status, ...stress,
     });
   }
-  const sortedProjects = [...projects.values()].sort((a, b) => b.lastTs - a.lastTs).slice(0, 12);
+  const sortedProjects = [...projects.values()]
+    .filter((project) => !isAppInternal(project.path))
+    .sort(byImportance)
+    .slice(0, BUILDING_PLOTS);
   for (const project of sortedProjects) {
     project.stack = stackOf(project.path);
     project.profile = profileOf(project.path);

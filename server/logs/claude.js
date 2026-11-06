@@ -31,13 +31,17 @@ function handleClaudeTool(agent, ts, block) {
 function handleClaudeLine(agent, line) {
   const isUsage = line.includes('"usage"');
   const isTool = line.includes('"tool_use"') || line.includes('"tool_result"');
-  const isMeta = line.includes('"custom-title"') || line.includes('"agent-name"') || (!agent.project || agent.project === 'unknown');
+  const isMeta = line.includes('"custom-title"') || line.includes('"agent-name"') || line.includes('"relocated"')
+    || (!agent.project || agent.project === 'unknown');
   const isHuman = line.includes('"kind":"human"') || line.includes('Request interrupted by user') || line.includes('"absorbed_mid_turn"');
   if (!isUsage && !isTool && !isMeta && !isHuman) return;
   let record;
   try { record = JSON.parse(line); } catch { return; }
   const ts = record.timestamp ? Date.parse(record.timestamp) : 0;
+  // A session belongs to the folder it started in; the shell's cd into other folders doesn't move it.
+  // Only a real move (the desktop app relocating the chat) does.
   if (record.cwd && !agent.cwd) setProject(agent, record.cwd);
+  if (record.type === 'relocated' && record.relocatedCwd) setProject(agent, record.relocatedCwd);
   if (record.type === 'custom-title' && record.customTitle) agent.title = record.customTitle;
   if (record.type === 'agent-name' && record.agentName && !agent.title) agent.title = record.agentName;
   // A message you type while the agent is mid-turn is logged only as an absorbed queue entry.

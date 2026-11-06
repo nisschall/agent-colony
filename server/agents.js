@@ -1,9 +1,11 @@
 // Agent records and everything that updates them: tokens, edits, your messages, stress and status.
 const path = require('path');
 const { MIN } = require('./config');
-const { layerOf } = require('./projects');
+const { fileProjectRoot, layerOf, projectName } = require('./projects');
 
 const agents = new Map();
+// Where each project credited from edits lives, so the town can find it (say, to hire an agent there).
+const projectPaths = new Map();
 
 const events = [];
 const dailyCost = new Map();
@@ -23,6 +25,7 @@ function getAgent(id, kind) {
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, context: 0, cost: 0,
     toolCalls: 0, toolErrors: 0, edits: 0, linesAdded: 0, linesRemoved: 0,
     files: new Set(), lastFile: '', lastAction: '', seenMsgIds: new Set(), layerTs: {},
+    credited: new Map(), workProject: '', workProjectTs: 0,
     recent: [], daily: new Map(),
     lastHumanTs: 0, humanMsgs: 0, interrupts: 0,
     waiting: false, waitingSince: 0, waitingAsk: '', pendingAsk: '', lastText: '',
@@ -35,7 +38,7 @@ function dayStats(agent, ts) {
   const key = dayKey(ts);
   let stats = agent.daily.get(key);
   if (!stats) {
-    stats = { cost: 0, lines: 0, edits: 0, humanMsgs: 0, minutes: new Set(), firstTs: ts };
+    stats = { cost: 0, lines: 0, edits: 0, humanMsgs: 0, minutes: new Set(), firstTs: ts, projects: new Map() };
     agent.daily.set(key, stats);
   }
   return stats;
@@ -75,6 +78,29 @@ function addCost(agent, ts, cost) {
   pushRecent(agent, { ts, cost, err: 0 });
 }
 
+// Edits to files in another project's folder count toward that project, not the one the session started in.
+// Files inside the session's own folder always stay with it, so sub-repos of a workspace don't split off.
+function creditedProject(agent, file) {
+  const normalized = file.replace(/\/\.claude\/worktrees\/[^/]+/, '');
+  if (!agent.cwd || normalized.startsWith(agent.cwd + path.sep)) return '';
+  const root = fileProjectRoot(normalized);
+  if (!root || root === agent.cwd) return '';
+  const name = projectName(root);
+  projectPaths.set(name, root);
+  return name;
+}
+
+function creditEdit(agent, ts, lines, project, today) {
+  const total = agent.credited.get(project) || { lines: 0, lastTs: 0 };
+  total.lines += lines;
+  total.lastTs = Math.max(total.lastTs, ts);
+  agent.credited.set(project, total);
+  const day = today.projects.get(project) || { lines: 0, minutes: new Set() };
+  day.lines += lines;
+  day.minutes.add(Math.floor(ts / MIN));
+  today.projects.set(project, day);
+}
+
 function addLines(agent, ts, added, removed, file, verb) {
   agent.edits += 1;
   agent.linesAdded += added;
@@ -85,8 +111,14 @@ function addLines(agent, ts, added, removed, file, verb) {
   if (file) {
     agent.files.add(file);
     agent.lastFile = file;
+    const project = creditedProject(agent, file);
+    if (project) creditEdit(agent, ts, added + removed, project, today);
+    if (ts >= agent.workProjectTs) {
+      agent.workProject = project;
+      agent.workProjectTs = ts;
+    }
     const layer = layerOf(agent, file);
-    if (layer) agent.layerTs[layer] = Math.max(agent.layerTs[layer] || 0, ts);
+    if (layer) agent.layerTs[layer] = { ts, project: project || '' };
   }
   const key = dayKey(ts);
   dailyLines.set(key, (dailyLines.get(key) || 0) + added + removed);
@@ -168,4 +200,4 @@ function statusOf(agent, now, stress) {
   return 'working';
 }
 
-module.exports = { agents, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };
+module.exports = { agents, projectPaths, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };
