@@ -24,6 +24,8 @@ const DEFAULT_PROJECTS_FOLDER = process.env.PROJECTS_FOLDER
 const ALLOWED_TOOLS = [
   'Read', 'Glob', 'Grep', 'Edit', 'Write', 'TodoWrite',
   'Bash(ls:*)', 'Bash(cat:*)', 'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)',
+  // Read-only git in another folder; a hired agent can't cd before running git.
+  'Bash(git fetch:*)', 'Bash(git -C * status*)', 'Bash(git -C * diff*)', 'Bash(git -C * log*)', 'Bash(git -C * fetch*)',
   'Bash(npm test:*)', 'Bash(npm run build:*)', 'Bash(npm run test:*)',
   'Bash(./mvnw compile:*)', 'Bash(./mvnw test:*)', 'Bash(./gradlew build:*)', 'Bash(./gradlew test:*)',
 ];

@@ -88,6 +88,9 @@ export function drawWorker(worker) {
     const flicker = Math.floor(state.time * 8) % 2;
     rect(worker.x - 2, iconY - 4 - flicker, 4, 5 + flicker, '#ff7a1a');
     rect(worker.x - 1, iconY - 2, 2, 3, '#ffe066');
+  } else if (agent.portal && agent.portal.outcome && agent.portal.outcome.state === 'done') {
+    rect(worker.x - 4, iconY - 6, 9, 9, '#fff');
+    for (const [dx, dy] of [[-2, -1], [-1, 0], [0, 1], [1, 0], [2, -1], [3, -2]]) rect(worker.x + dx, iconY - 2 + dy, 1, 2, '#2e9e4f');
   } else if (agent.status === 'sleeping') {
     const t = (state.time * 0.6 + (hash(agent.id) % 10) / 10) % 1;
     ctx.fillStyle = `rgba(255,255,255,${1 - t})`;

@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { addEvent, agents, getAgent, markHuman, markInterrupted, projectPaths, touch } = require('./agents');
+const { addEvent, agents, getAgent, markHuman, markInterrupted, projectPaths, shortTarget, touch } = require('./agents');
 const { ApiError } = require('./api-error');
 const { ALLOWED_TOOLS, CLAUDE_BIN, MODELS, PORTAL_FILE } = require('./config');
 const { setProject } = require('./projects');
@@ -12,6 +12,7 @@ const { discover } = require('./scanner');
 
 const portalAgents = loadPortalAgents();
 const runningProcesses = new Map();
+const REPLY_LIMIT = 4000;
 
 function loadPortalAgents() {
   try { return JSON.parse(fs.readFileSync(PORTAL_FILE, 'utf8')); } catch { return {}; }
@@ -21,14 +22,48 @@ function savePortalAgents() {
   fs.writeFileSync(PORTAL_FILE, JSON.stringify(portalAgents, null, 2));
 }
 
-function portalStatus(agentId) {
-  if (!portalAgents[agentId]) return null;
-  return { running: runningProcesses.has(agentId) };
+// A run's outcome stops counting once you talk to the agent again (here, or in Terminal).
+function portalStatus(agent) {
+  const record = portalAgents[agent.id];
+  if (!record) return null;
+  const running = runningProcesses.has(agent.id);
+  const outcome = record.outcome;
+  const current = !running && outcome && agent.lastHumanTs <= outcome.ts;
+  return { running, outcome: current ? outcome : null };
+}
+
+function firstSentence(text) {
+  return text.split(/(?<=[.!?])\s+/)[0].replace(/\s+/g, ' ').slice(0, 160);
+}
+
+// A hired agent can't show you an approval prompt: a blocked action, an error or a closing question means it needs you.
+function recordOutcome(agentId, output) {
+  let result;
+  try { result = JSON.parse(output); } catch { return; }
+  const reply = String(result.result || '').trim();
+  const denials = result.permission_denials || [];
+  const blocked = [...new Set(denials.map((denial) => shortTarget(denial.tool_name, denial.tool_input)))].slice(0, 5);
+  const question = reply.endsWith('?') ? reply.split(/(?<=[.!\n])\s+/).pop() : '';
+  let summary = firstSentence(reply);
+  if (blocked.length) summary = `Blocked from ${blocked[0]}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}`;
+  else if (question) summary = question.slice(0, 160);
+  const needsYou = Boolean(blocked.length || result.is_error || question);
+  const outcome = { state: needsYou ? 'needs-you' : 'done', summary, reply: reply.slice(0, REPLY_LIMIT), blocked, ts: Date.now() };
+  portalAgents[agentId].outcome = outcome;
+  savePortalAgents();
+  const agent = agents.get(agentId);
+  if (!agent) return;
+  if (needsYou) addEvent(agent, outcome.ts, 'waiting', `needs you: ${summary.slice(0, 60)}`);
+  else addEvent(agent, outcome.ts, 'build', `finished: ${summary.slice(0, 60)}`);
 }
 
 function runClaude(agentId, args, cwd) {
-  const child = spawn(CLAUDE_BIN, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
+  delete portalAgents[agentId].outcome;
+  savePortalAgents();
+  const child = spawn(CLAUDE_BIN, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
   let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
   child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-500); });
   runningProcesses.set(agentId, child);
   child.on('error', (err) => console.error(`[portal] ${agentId} failed to start: ${err.message}`));
@@ -36,13 +71,14 @@ function runClaude(agentId, args, cwd) {
     runningProcesses.delete(agentId);
     const agent = agents.get(agentId);
     if (code && agent) addEvent(agent, Date.now(), 'error', `stopped (exit ${code}) ${stderr.trim().slice(0, 60)}`);
+    recordOutcome(agentId, stdout);
     console.log(`[portal] ${agentId} finished with exit code ${code}`);
     discover();
   });
 }
 
 function claudeArgs(prompt, model) {
-  return ['-p', prompt, '--model', model, '--permission-mode', 'acceptEdits', '--allowedTools', ALLOWED_TOOLS.join(',')];
+  return ['-p', prompt, '--model', model, '--output-format', 'json', '--permission-mode', 'acceptEdits', '--allowedTools', ALLOWED_TOOLS.join(',')];
 }
 
 function hireAgent({ project, model, brief }) {

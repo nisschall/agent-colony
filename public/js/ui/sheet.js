@@ -70,12 +70,22 @@ function renderOrdersBox(agent) {
   terminalButton.style.display = portal ? '' : 'none';
   stopButton.style.display = portal && portal.running ? '' : 'none';
   watchOnly.textContent = portal ? '' : 'Watch-only: this agent lives in the Claude app, so reply to it there.';
+  const outcome = portal && portal.outcome;
+  document.getElementById('replyBox').classList.toggle('open', Boolean(outcome));
   if (!portal) return;
   sendButton.disabled = portal.running;
   terminalButton.disabled = portal.running;
-  note.textContent = portal.running
-    ? 'Working on your last orders. You can send more once it finishes.'
-    : agent.status === 'waiting' ? `It asks: ${agent.waitingAsk}` : 'Idle. Give it the next task or follow-up.';
+  if (outcome) document.getElementById('sheetReply').textContent = outcome.reply;
+  note.textContent = ordersNote(agent, portal);
+}
+
+function ordersNote(agent, portal) {
+  if (portal.running) return 'Working on your last orders. You can send more once it finishes.';
+  const outcome = portal.outcome;
+  if (outcome && outcome.state === 'needs-you') return `🙋 Needs you: ${outcome.summary}. Its reply above says what to do.`;
+  if (outcome) return '✓ Done. Give it the next task or follow-up.';
+  if (agent.status === 'waiting') return `It asks: ${agent.waitingAsk}`;
+  return 'Idle. Give it the next task or follow-up.';
 }
 
 document.getElementById('btnOrders').onclick = async () => {

@@ -1,7 +1,7 @@
 // The colony state sent to every open page.
 const { agents, dailyCost, dailyLines, dayKey, events, projectPaths, statusOf, stressOf } = require('./agents');
 const { DEFAULT_PROJECTS_FOLDER, HISTORY_DAYS, MIN } = require('./config');
-const { portalAgents, portalStatus, runningProcesses } = require('./portal');
+const { portalStatus } = require('./portal');
 const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects');
 const { currentTownSeed } = require('./town');
 
@@ -86,11 +86,17 @@ function snapshot(ready) {
     if (now - agent.lastTs > 24 * 60 * MIN) continue;
     const stress = stressOf(agent, now);
     let status = statusOf(agent, now, stress);
-    // For portal-hired agents we know exactly whether the process is running.
-    if (portalAgents[agent.id]) {
-      const running = runningProcesses.has(agent.id);
-      if (running && (status === 'idle' || status === 'sleeping' || status === 'waiting')) status = 'working';
-      if (!running && ['working', 'overworked', 'stuck'].includes(status)) status = 'idle';
+    let { waitingAsk, waitingSince } = agent;
+    // For portal-hired agents we know exactly whether the process is running, and how its last run ended.
+    const portal = portalStatus(agent);
+    if (portal) {
+      if (portal.running && (status === 'idle' || status === 'sleeping' || status === 'waiting')) status = 'working';
+      if (!portal.running && ['working', 'overworked', 'stuck'].includes(status)) status = 'idle';
+      if (portal.outcome?.state === 'needs-you') {
+        status = 'waiting';
+        waitingAsk = portal.outcome.summary;
+        waitingSince = portal.outcome.ts;
+      }
     }
     const workingRecently = agent.workProject && now - agent.workProjectTs < WORK_HERE_MS;
     const workProject = workingRecently ? agent.workProject : agent.project;
@@ -112,8 +118,8 @@ function snapshot(ready) {
       linesAdded: agent.linesAdded, linesRemoved: agent.linesRemoved,
       filesTouched: agent.files.size, lastFile: agent.lastFile, lastAction: agent.lastAction,
       lastHumanTs: agent.lastHumanTs, humanMsgs: agent.humanMsgs, interrupts: agent.interrupts,
-      waiting: agent.waiting, waitingSince: agent.waitingSince, waitingAsk: agent.waitingAsk,
-      portal: portalStatus(agent.id),
+      waiting: status === 'waiting', waitingSince, waitingAsk,
+      portal,
       status, ...stress,
     });
   }
