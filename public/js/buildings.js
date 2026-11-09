@@ -3,7 +3,7 @@ import { OUTLINE, ctx, rect, shade } from './canvas.js';
 import { BUILDING_W, FLOOR_H, MAX_FLOORS } from './config.js';
 import { currentHour, daylight, drawSunShadow } from './lighting.js';
 import { state } from './state.js';
-import { hash, seeded, siteOf } from './utils.js';
+import { duration, hash, seeded, siteOf } from './utils.js';
 
 export const TIERS = {
   cottage: { label: 'Cottage', article: 'a', w: 56, floors: [1, 1] },
@@ -28,9 +28,17 @@ export const LAYER_LABELS = {
   ui: 'screens', api: 'the API', db: 'the database', messaging: 'messaging', security: 'login & security',
   jobs: 'scheduled jobs', containers: 'Docker setup', tests: 'tests', ci: 'the CI pipeline', ai: 'AI calls',
 };
-const MAX_ADDONS = 3;
+// Bigger buildings show more of their project's features; a landmark gets one more.
+const ADDON_LIMITS = { cottage: 1, house: 2, office: 3, tower: 4, campus: 5 };
+const MAX_ADDONS = 5;
+// Complexity (0–100, from the server) at which a project becomes the town's landmark: glass front, gold trim, beacon.
+export const LANDMARK_COMPLEXITY = 75;
+const STAR_STEPS = [20, 40, 60, LANDMARK_COMPLEXITY];
+const LANDMARK_MAST = 24;
+const UNMEASURED_MAX_FLOORS = 4;
 const HEAVY_LINES_TODAY = 300;
 const ERROR_SMOKE_THRESHOLD = 2;
+const HEAVY_SMOKE_THRESHOLD = 6;
 const QUIET_DAYS = 7;
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const SIGNAL = '#7ee0ff';
@@ -62,20 +70,32 @@ export function varietyFor(seed) {
   };
 }
 
+// 1–5 stars from the project's complexity score.
+export function starsOf(profile) {
+  if (!profile || profile.complexity === undefined) return 0;
+  return 1 + STAR_STEPS.filter((step) => profile.complexity >= step).length;
+}
+
 export function floorsFor(project, wobble) {
   const profile = project.profile;
-  if (!profile) return Math.max(1, Math.min(MAX_FLOORS, Math.round(1 + Math.log2(1 + project.lines / 60))));
+  // A folder we can't measure stays modest rather than out-growing projects we know are complex.
+  if (!profile) return Math.max(1, Math.min(UNMEASURED_MAX_FLOORS, Math.round(1 + Math.log2(1 + project.lines / 600))));
+  // Height follows complexity exactly, so a taller building is always the more complex project.
+  if (profile.complexity !== undefined) return Math.max(1, Math.round(1 + (profile.complexity * (MAX_FLOORS - 1)) / 100));
   const [fewest, most] = TIERS[profile.tier].floors;
   const bySize = Math.round(Math.log2(Math.max(1, profile.sourceFiles) / 10)) + wobble;
   return Math.max(fewest, Math.min(most, bySize));
 }
 
 export function addonsFor(project) {
-  const features = project.profile ? project.profile.features : [];
+  const profile = project.profile;
+  const features = profile ? profile.features : [];
+  const landmarkBonus = profile && profile.complexity >= LANDMARK_COMPLEXITY ? 1 : 0;
+  const limit = Math.min(MAX_ADDONS, (profile ? ADDON_LIMITS[profile.tier] : 3) + landmarkBonus);
   const taken = new Set();
   const addons = [];
   for (const [feature, info] of Object.entries(FEATURES)) {
-    if (addons.length === MAX_ADDONS) break;
+    if (addons.length === limit) break;
     if (!features.includes(feature)) continue;
     const slot = info.slots.find((s) => !taken.has(s));
     if (!slot) continue;
@@ -103,13 +123,37 @@ function wingsFor(b) {
 
 export function buildingHealth(b) {
   const project = b.project;
+  const problems = project.problems || { failing: [], errorsLastHour: 0 };
   return {
     active: project.active > 0,
     heavy: (project.linesToday || 0) >= HEAVY_LINES_TODAY,
-    smoking: (project.errors || 0) >= ERROR_SMOKE_THRESHOLD,
+    failing: problems.failing,
+    errors: problems.errorsLastHour,
+    smoking: problems.errorsLastHour >= ERROR_SMOKE_THRESHOLD,
+    heavySmoke: problems.errorsLastHour >= HEAVY_SMOKE_THRESHOLD,
+    waiting: (project.waitingIds || []).length,
+    landmark: Boolean(project.profile && project.profile.complexity >= LANDMARK_COMPLEXITY),
     quiet: Date.now() - project.lastTs > QUIET_DAYS * DAY_MS,
     live: new Set(project.layers || []),
   };
+}
+
+function agentName(agentId) {
+  const worker = state.workers.get(agentId);
+  return worker ? worker.look.name : 'an agent';
+}
+
+// What's wrong in a building, worst first. Lines with an agentId can take you to that agent.
+export function problemLines(b) {
+  const health = buildingHealth(b);
+  const lines = health.failing.map((check) => ({
+    tone: 'bad',
+    agentId: check.agentId,
+    text: `⚠ ${check.kind === 'tests' ? 'Tests' : 'Build'} failing · ${check.command} · ${duration(Date.now() - check.ts)} ago · ${agentName(check.agentId)}`,
+  }));
+  if (health.errors) lines.push({ tone: health.smoking ? 'bad' : 'muted', text: `💨 ${health.errors} tool error${health.errors > 1 ? 's' : ''} in the last hour` });
+  for (const agentId of b.project.waitingIds || []) lines.push({ tone: 'wait', agentId, text: `🙋 ${agentName(agentId)} is waiting on you` });
+  return lines;
 }
 
 export function drawBuilding(b) {
@@ -134,14 +178,17 @@ export function drawBuilding(b) {
     if (flatRoof) drawRoofClutter(wing, tops[i] - 4, b.variety.roofClutter[i], wing === main);
   });
   if (health.quiet) wings.forEach((wing, i) => drawVines(wing, b.y, tops[i], b.seed + i));
-  if (health.smoking) drawErrorSmoke(b.x, roofTop);
+  if (health.landmark) drawLandmark(main, top, roofTop, b.y);
+  if (health.smoking) drawErrorSmoke(b.x, roofTop, health.heavySmoke);
+  if (health.failing.length) drawAlarm(b, main, roofTop);
 
   const left = Math.min(...wings.map((wing) => wing.x)) - 1;
   const right = Math.max(...wings.map((wing) => wing.x + wing.w)) + 1;
   const hasBooth = (b.addons || []).some((addon) => addon.slot === 'door');
   drawYard(b, left, right, hasBooth);
   const mainHeight = (b.y - top) * b.variety.addonScale;
-  let highest = roofTop;
+  // The landmark's beacon stands above the roof, so its label goes above the beacon.
+  let highest = health.landmark ? roofTop - LANDMARK_MAST : roofTop;
   for (const addon of b.addons || []) {
     const feature = addon.feature;
     const slot = b.variety.mirrored ? MIRRORED_SLOT[addon.slot] || addon.slot : addon.slot;
@@ -198,7 +245,8 @@ function drawWing(b, wing, wall, health, storefront, isMain) {
       }
       const roll = (hash(`${b.name}|${x}|${f}|${i}|${tick}`) % 100) / 100;
       const lit = !health.quiet && roll < (health.active ? 0.7 : 0.18) + daylight() * 0.15;
-      rect(wx, fy, windows.w, windows.h, lit ? '#ffe08a' : '#3a4a66');
+      const glass = health.landmark ? '#4d7ea8' : '#3a4a66';
+      rect(wx, fy, windows.w, windows.h, lit ? '#ffe08a' : glass);
       rect(wx, fy, windows.w, 1, lit ? '#fff3c4' : '#58709a');
       if (lit) state.lights.push({ x: wx + windows.w / 2, y: fy + 3, r: 6 });
     }
@@ -316,14 +364,64 @@ function drawCrackedWindow(wx, fy) {
   rect(wx + 5, fy + 4, 1, 1, '#cfd6e0');
 }
 
-function drawErrorSmoke(cx, y) {
-  for (let i = 0; i < 5; i++) {
-    const t = (buildingClock * 0.35 + i / 5) % 1;
-    ctx.fillStyle = `rgba(55, 55, 65, ${0.55 * (1 - t)})`;
+function drawErrorSmoke(cx, y, heavy) {
+  const puffs = heavy ? 9 : 5;
+  const reach = heavy ? 50 : 34;
+  for (let i = 0; i < puffs; i++) {
+    const t = (buildingClock * 0.35 + i / puffs) % 1;
+    ctx.fillStyle = `rgba(55, 55, 65, ${(heavy ? 0.7 : 0.55) * (1 - t)})`;
     ctx.beginPath();
-    ctx.arc(cx + Math.sin(t * 5 + i) * 4 + t * 8, y - 2 - t * 34, 3 + t * 7, 0, Math.PI * 2);
+    ctx.arc(cx + Math.sin(t * 5 + i) * 4 + t * 8, y - 2 - t * reach, 3 + t * (heavy ? 10 : 7), 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// A failing build or test run: a warning sign by the door and a flashing red light on the roof, until a run passes.
+function drawAlarm(b, main, roofTop) {
+  const flash = Math.floor(buildingClock * 3) % 2 === 0;
+  // Left of the door: the security booth, when there is one, takes the right.
+  const sx = b.x - 16;
+  rect(sx, b.y - 9, 1, 9, '#5a3a22');
+  ctx.fillStyle = '#ffcc33';
+  ctx.beginPath();
+  ctx.moveTo(sx + 0.5, b.y - 19);
+  ctx.lineTo(sx + 6, b.y - 9);
+  ctx.lineTo(sx - 5, b.y - 9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#c62828';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  rect(sx, b.y - 16, 1, 4, '#1b1428');
+  rect(sx, b.y - 11, 1, 1, '#1b1428');
+  const lx = main.x + 6;
+  rect(lx - 1, roofTop - 2, 8, 3, '#3a3a44');
+  rect(lx, roofTop - 7, 6, 5, flash ? '#ff3b3b' : '#7a1d1d');
+  rect(lx + 1, roofTop - 6, 2, 1, flash ? '#ffc4c4' : '#a33');
+  if (flash) state.lights.push({ x: lx + 3, y: roofTop - 5, r: 14 });
+}
+
+// The most complex project in town: a glass front, a gold cornice and a beacon on a mast.
+function drawLandmark(main, top, roofTop, groundY) {
+  ctx.fillStyle = 'rgba(190, 230, 255, 0.16)';
+  for (const share of [0.15, 0.55]) {
+    const x0 = main.x + main.w * share;
+    ctx.beginPath();
+    ctx.moveTo(x0, top + 2);
+    ctx.lineTo(x0 + 10, top + 2);
+    ctx.lineTo(x0 - 6, groundY - 2);
+    ctx.lineTo(x0 - 16, groundY - 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  rect(main.x - 3, top - 6, main.w + 6, 3, '#ffd75e');
+  rect(main.x - 3, top - 3, main.w + 6, 1, '#b8860b');
+  const mx = Math.round(main.x + main.w / 2);
+  rect(mx, roofTop - 18, 1, 16, '#9aa3ad');
+  rect(mx - 2, roofTop - 6, 5, 1, '#9aa3ad');
+  const blink = Math.floor(buildingClock * 1.5) % 2 === 0;
+  rect(mx - 1, roofTop - 21, 3, 3, blink ? '#ff5a5a' : '#ffd0d0');
+  if (blink) state.lights.push({ x: mx, y: roofTop - 20, r: 9 });
 }
 
 function drawVines(wing, groundY, top, seed) {

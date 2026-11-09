@@ -2,7 +2,9 @@
 import { API_TOKEN, FLOOR_H } from '../config.js';
 import { addToast } from '../hud.js';
 import { state } from '../state.js';
-import { money } from '../utils.js';
+import { escapeHtml, money } from '../utils.js';
+import { problemLines } from '../buildings.js';
+import { selectWorker } from './sheet.js';
 
 // `quiet` skips the error toast, for requests that repeat on a timer.
 export async function api(path, body, quiet = false) {
@@ -23,14 +25,32 @@ export async function api(path, body, quiet = false) {
 
 let menuBuilding = null;
 
+// Problems in the building menu; a line about an agent opens that agent's card.
+function renderProblems(building) {
+  const box = document.getElementById('ctxProblems');
+  box.innerHTML = problemLines(building).map((problem) => {
+    const text = escapeHtml(problem.text);
+    const body = problem.agentId ? `<a data-agent="${escapeHtml(problem.agentId)}">${text}</a>` : text;
+    return `<div class="problem ${problem.tone}">${body}</div>`;
+  }).join('');
+}
+
+document.getElementById('ctxProblems').addEventListener('click', (e) => {
+  const link = e.target.closest('a[data-agent]');
+  if (!link || !state.workers.has(link.dataset.agent)) return;
+  closeBuildingMenu();
+  selectWorker(link.dataset.agent, true);
+});
+
 export function openBuildingMenu(building, sx, sy) {
   menuBuilding = building;
   const menu = document.getElementById('ctxMenu');
   document.getElementById('ctxTitle').textContent = building.name.toUpperCase();
+  renderProblems(building);
   document.getElementById('ctxHire').disabled = !building.project.path;
   menu.classList.add('open');
-  menu.style.left = `${Math.min(sx, innerWidth - 220)}px`;
-  menu.style.top = `${Math.min(sy, innerHeight - 120)}px`;
+  menu.style.left = `${Math.min(sx, innerWidth - menu.offsetWidth - 8)}px`;
+  menu.style.top = `${Math.min(sy, innerHeight - menu.offsetHeight - 8)}px`;
 }
 
 export function closeBuildingMenu() {

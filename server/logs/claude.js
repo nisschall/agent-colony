@@ -1,6 +1,7 @@
 // Reads Claude Code transcript lines into agent records.
 const { addCost, addEvent, addLines, countLines, endTurn, humanText, markHuman, markInterrupted, pushRecent, shortTarget, startWaiting, touch } = require('../agents');
 const { priceFor } = require('../pricing');
+const { noteCommand, noteResult } = require('../checks');
 const { setProject } = require('../projects');
 
 function handleClaudeTool(agent, ts, block) {
@@ -23,6 +24,8 @@ function handleClaudeTool(agent, ts, block) {
     addLines(agent, ts, added, removed, input.file_path, 'Rebuilt');
   } else if (block.name === 'Write') {
     addLines(agent, ts, countLines(input.content), 0, input.file_path, 'Built');
+  } else if (block.name === 'Bash') {
+    noteCommand(agent, block.id, input.command, ts);
   } else if (block.name === 'Agent' || block.name === 'Task') {
     addEvent(agent, ts, 'hire', `hired a helper: ${String(input.description || 'subagent').slice(0, 50)}`);
   }
@@ -91,6 +94,7 @@ function handleClaudeLine(agent, line) {
   if (!Array.isArray(message.content)) return;
   for (const block of message.content) {
     if (block.type === 'tool_use') handleClaudeTool(agent, ts, block);
+    if (block.type === 'tool_result') noteResult(agent, block, ts);
     if (block.type === 'tool_result' && block.is_error) {
       agent.toolErrors += 1;
       pushRecent(agent, { ts, cost: 0, err: 1 });

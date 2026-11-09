@@ -2,6 +2,7 @@
 const { agents, dailyCost, dailyLines, dayKey, events, projectPaths, statusOf, stressOf } = require('./agents');
 const { DEFAULT_PROJECTS_FOLDER, HISTORY_DAYS, MIN } = require('./config');
 const { isReleased, portalStatus } = require('./portal');
+const { problemsOf } = require('./checks');
 const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects');
 const { currentTownSeed } = require('./town');
 
@@ -20,7 +21,7 @@ const WORK_HERE_MS = 15 * MIN;
 function projectEntry(projects, name) {
   let project = projects.get(name);
   if (!project) {
-    project = { name, path: '', lines: 0, linesToday: 0, cost: 0, agents: 0, active: 0, errors: 0, lastTs: 0, weekScore: 0, layers: [] };
+    project = { name, path: '', lines: 0, linesToday: 0, cost: 0, agents: 0, active: 0, errors: 0, lastTs: 0, weekScore: 0, layers: [], waitingIds: [] };
     projects.set(name, project);
   }
   return project;
@@ -104,6 +105,7 @@ function snapshot(ready) {
     here.agents += 1;
     here.errors += stress.recentErrors;
     if (status !== 'sleeping' && status !== 'idle') here.active += 1;
+    if (status === 'waiting') here.waitingIds.push(agent.id);
     const todayStats = agent.daily.get(today);
     const todaySummary = todayStats && {
       cost: todayStats.cost, lines: todayStats.lines, edits: todayStats.edits, humanMsgs: todayStats.humanMsgs,
@@ -130,6 +132,7 @@ function snapshot(ready) {
   for (const project of sortedProjects) {
     project.stack = stackOf(project.path);
     project.profile = profileOf(project.path);
+    project.problems = problemsOf(project.name, now);
   }
   const sortedEvents = events.slice().sort((a, b) => a.ts - b.ts).slice(-80);
   return {

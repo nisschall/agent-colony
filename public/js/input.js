@@ -1,5 +1,5 @@
 // Mouse and keyboard: panning, zooming, hovering and clicking things in the town.
-import { DAY_MS, FEATURES, LAYER_LABELS, TIERS, buildingHealth } from './buildings.js';
+import { DAY_MS, FEATURES, LAYER_LABELS, TIERS, buildingHealth, problemLines, starsOf } from './buildings.js';
 import { screenToWorld } from './camera.js';
 import { canvas } from './canvas.js';
 import { statusLabel } from './hud.js';
@@ -95,7 +95,13 @@ function buildingTooltip(building) {
   const lines = [`<b style="color:var(--gold)">${escapeHtml(p.name)}</b>`];
   if (profile) {
     const modules = profile.modules > 1 ? ` · ${profile.modules} modules` : '';
-    lines.push(`${TIERS[profile.tier].label} · ${compact(profile.sourceFiles)} source files${modules}`);
+    const stars = starsOf(profile);
+    if (stars) lines.push(`<span style="color:var(--gold)">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}</span> ${TIERS[profile.tier].label} · complexity ${profile.complexity}/100`);
+    else lines.push(TIERS[profile.tier].label);
+    const size = profile.codeLines !== undefined ? `${compact(profile.codeLines)} lines of code · ` : '';
+    const languages = profile.languages && profile.languages.length ? ` · ${profile.languages.join(', ')}` : '';
+    const dependencies = profile.dependencies ? ` · ${profile.dependencies} dependencies` : '';
+    lines.push(`${size}${compact(profile.sourceFiles)} files${modules}${languages}${dependencies}`);
     const features = Object.keys(FEATURES).filter((f) => profile.features.includes(f)).map((f) => FEATURES[f].label);
     if (profile.ui) features.unshift('Web UI');
     if (features.length) lines.push(muted(features.join(' · ')));
@@ -104,7 +110,10 @@ function buildingTooltip(building) {
   lines.push(`${p.active} at work · ${p.agents} today`);
   const health = buildingHealth(building);
   if (health.live.size) lines.push(`<span style="color:var(--gold)">Now editing ${[...health.live].map((l) => LAYER_LABELS[l]).join(', ')}</span>`);
-  if (health.smoking) lines.push(`💨 ${p.errors} errors in the last 15 min`);
+  for (const problem of problemLines(building)) {
+    const color = problem.tone === 'bad' ? 'var(--red)' : problem.tone === 'wait' ? 'var(--gold)' : 'var(--muted)';
+    lines.push(`<span style="color:${color}">${escapeHtml(problem.text)}</span>`);
+  }
   if (health.heavy) lines.push(`🏗 ${compact(p.linesToday)} lines changed today`);
   if (health.quiet) lines.push(`🌿 Quiet for ${Math.floor((Date.now() - p.lastTs) / DAY_MS)} days`);
   lines.push(muted('Right-click to hire an agent'));

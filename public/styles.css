@@ -222,6 +222,12 @@ canvas#world.dragging { cursor: grabbing; }
 #ctxMenu.open { display: block; }
 #ctxMenu .label { padding: 4px 6px; }
 #ctxMenu button { display: block; width: 100%; text-align: left; margin-top: 4px; }
+#ctxMenu { max-width: 340px; }
+#ctxProblems .problem { padding: 2px 6px; line-height: 1; overflow-wrap: anywhere; }
+#ctxProblems .bad { color: var(--red); }
+#ctxProblems .wait { color: var(--gold); }
+#ctxProblems .muted { color: var(--muted); }
+#ctxProblems a { color: inherit; text-decoration: underline; cursor: pointer; }
 #hire { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); display: none; z-index: 6; }
 #hire.open { display: block; }
 #hire h2 { margin: 0 0 4px; font-family: 'Press Start 2P', monospace; font-size: 12px; color: var(--gold); }

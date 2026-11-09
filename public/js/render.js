@@ -1,6 +1,6 @@
 // Drawing one frame of the town, plus labels, particles and floating text.
 import { CARS, drawBirds, drawCar, drawClouds, drawWeather } from './ambient.js';
-import { drawBuilding, styleFor } from './buildings.js';
+import { buildingHealth, drawBuilding, styleFor } from './buildings.js';
 import { worldToScreenMatrix } from './camera.js';
 import { GLOW, canvas, ctx, pill, rect, toScreen } from './canvas.js';
 import { TILE } from './config.js';
@@ -135,13 +135,24 @@ function drawLabels() {
   const zoom = state.camera.zoom;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
+  const pulse = Math.floor(state.time * 2) % 2 === 0;
   for (const building of state.buildings.values()) {
     const { emblem } = styleFor(building);
+    const health = buildingHealth(building);
     const active = building.project.active;
     const name = building.name.length > 20 ? `${building.name.slice(0, 19)}…` : building.name;
-    const text = `${emblem ? `${emblem} ` : ''}${name}${active ? ` · ${active}⚒` : ''}`;
+    const failing = health.failing.map((check) => check.kind).join(' + ');
+    const parts = [
+      `${health.landmark ? '★ ' : ''}${emblem ? `${emblem} ` : ''}${name}`,
+      active ? `${active}⚒` : '',
+      failing ? `⚠ ${failing} failing` : health.smoking ? `⚠ ${health.errors} errors` : '',
+      health.waiting ? `🙋 ${health.waiting}` : '',
+    ];
+    const text = parts.filter(Boolean).join(' · ');
     const at = toScreen(m, building.x, building.labelY);
-    pill(text, at.x, at.y, 15, active ? '#ffcc33' : '#f4e9c9', 'rgba(27,20,40,.8)');
+    const color = failing || health.smoking ? '#ff8a8a' : active ? '#ffcc33' : '#f4e9c9';
+    if (health.waiting && pulse) pill(text, at.x, at.y, 15, '#1b1428', '#ffcc33');
+    else pill(text, at.x, at.y, 15, color, 'rgba(27,20,40,.8)');
   }
 
   const rec = toScreen(m, (REC.x0 + REC.x1) / 2, REC.y0 - 8);

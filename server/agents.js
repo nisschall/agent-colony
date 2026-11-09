@@ -25,7 +25,7 @@ function getAgent(id, kind) {
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, context: 0, cost: 0,
     toolCalls: 0, toolErrors: 0, edits: 0, linesAdded: 0, linesRemoved: 0,
     files: new Set(), lastFile: '', lastAction: '', seenMsgIds: new Set(), layerTs: {},
-    credited: new Map(), workProject: '', workProjectTs: 0,
+    credited: new Map(), workProject: '', workProjectTs: 0, pendingChecks: new Map(),
     recent: [], daily: new Map(),
     lastHumanTs: 0, humanMsgs: 0, interrupts: 0,
     waiting: false, waitingSince: 0, waitingAsk: '', pendingAsk: '', lastText: '',
@@ -200,4 +200,4 @@ function statusOf(agent, now, stress) {
   return 'working';
 }
 
-module.exports = { agents, projectPaths, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };
+module.exports = { creditedProject, agents, projectPaths, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };

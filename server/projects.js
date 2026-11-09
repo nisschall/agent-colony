@@ -44,6 +44,15 @@ const SKIP_DIRS = new Set(['node_modules', 'target', 'build', 'dist', 'out', 'bi
 const TEST_DIRS = new Set(['test', 'tests', '__tests__', 'e2e']);
 const SOURCE_FILE = /\.(java|kt|kts|scala|ts|tsx|js|jsx|mjs|py|go|rs|swift|cs|rb|php|vue|svelte|html|scss|css|sql)$/;
 const TEST_FILE = /[._](spec|test)\.|^test_|Tests?\.java$/;
+const GENERATED_FILE = /\.min\.|bundle\.|\.map$|-lock\./;
+// Markup and styles count towards lines but not towards languages.
+const LANGUAGES = {
+  java: 'Java', kt: 'Kotlin', kts: 'Kotlin', scala: 'Scala', ts: 'TypeScript', tsx: 'TypeScript', js: 'JavaScript', jsx: 'JavaScript',
+  mjs: 'JavaScript', py: 'Python', go: 'Go', rs: 'Rust', swift: 'Swift', cs: 'C#', rb: 'Ruby', php: 'PHP', vue: 'Vue', svelte: 'Svelte', sql: 'SQL',
+};
+const LANGUAGE_MIN_FILES = 5;
+const MAX_FILE_BYTES = 512 * 1024;
+const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 const PROJECT_MANIFESTS = [
   'pom.xml', 'build.gradle', 'build.gradle.kts', 'package.json', 'requirements.txt', 'pyproject.toml', 'setup.py',
   'go.mod', 'Cargo.toml', 'Gemfile', 'composer.json',
@@ -75,10 +84,25 @@ function hasAny(folders, markers) {
   return folders.some((folder) => markers.some((marker) => fs.existsSync(path.join(folder, marker))));
 }
 
+function countLines(file, budget) {
+  let size;
+  try { size = fs.statSync(file).size; } catch { return 0; }
+  if (size > MAX_FILE_BYTES || size > budget.bytes) return 0;
+  budget.bytes -= size;
+  let buffer;
+  try { buffer = fs.readFileSync(file); } catch { return 0; }
+  let lines = 0;
+  for (let at = buffer.indexOf(10); at !== -1; at = buffer.indexOf(10, at + 1)) lines += 1;
+  return lines;
+}
+
 function walkSources(root) {
   let sourceFiles = 0;
+  let codeLines = 0;
   let visited = 0;
   let hasTests = false;
+  const filesByLanguage = new Map();
+  const budget = { bytes: MAX_TOTAL_BYTES };
   const pending = [[root, 0]];
   while (pending.length && visited < MAX_ENTRIES_SCANNED) {
     const [dir, depth] = pending.pop();
@@ -90,20 +114,56 @@ function walkSources(root) {
         if (TEST_DIRS.has(entry.name)) hasTests = true;
         const skip = entry.name.startsWith('.') || SKIP_DIRS.has(entry.name) || depth >= 12;
         if (!skip) pending.push([path.join(dir, entry.name), depth + 1]);
-      } else if (SOURCE_FILE.test(entry.name)) {
+      } else if (SOURCE_FILE.test(entry.name) && !GENERATED_FILE.test(entry.name)) {
         sourceFiles += 1;
         if (TEST_FILE.test(entry.name)) hasTests = true;
+        codeLines += countLines(path.join(dir, entry.name), budget);
+        const language = LANGUAGES[path.extname(entry.name).slice(1)];
+        if (language) filesByLanguage.set(language, (filesByLanguage.get(language) || 0) + 1);
       }
     }
   }
-  return { sourceFiles, hasTests };
+  const languages = [...filesByLanguage].filter(([, count]) => count >= LANGUAGE_MIN_FILES).map(([language]) => language);
+  return { sourceFiles, codeLines, languages, hasTests };
 }
 
-function tierOf(sourceFiles, modules) {
-  if (modules >= 3 && sourceFiles >= 150) return 'campus';
-  if (sourceFiles >= 800) return 'tower';
-  if (sourceFiles >= 150) return 'office';
-  if (sourceFiles >= 30) return 'house';
+// Rough count of declared dependencies across the build files we already read.
+function dependencyCount(folders) {
+  let count = 0;
+  for (const dir of folders) {
+    count += (readSmall(path.join(dir, 'pom.xml')).match(/<dependency>/g) || []).length;
+    for (const gradle of ['build.gradle', 'build.gradle.kts']) {
+      count += (readSmall(path.join(dir, gradle)).match(/^\s*(implementation|api|compileOnly|runtimeOnly|testImplementation)\b/gm) || []).length;
+    }
+    count += (readSmall(path.join(dir, 'requirements.txt')).match(/^\s*[A-Za-z]/gm) || []).length;
+    count += (readSmall(path.join(dir, 'go.mod')).match(/^\s+\S+ v\d/gm) || []).length;
+    try {
+      const pkg = JSON.parse(readSmall(path.join(dir, 'package.json')) || '{}');
+      count += Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length;
+    } catch { /* not valid JSON */ }
+  }
+  return count;
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+// 0–100: how big and how involved a project is. Size counts most; features, modules, languages and dependencies add breadth.
+function complexityOf({ codeLines, features, modules, languages, dependencies }) {
+  const size = 40 * clamp01(Math.log10(Math.max(1, codeLines) / 500) / Math.log10(400));
+  const breadth = 3 * Math.min(features.length, 9);
+  const parts = 4 * Math.min(modules, 3);
+  const polyglot = 3 * Math.min(Math.max(0, languages.length - 1), 3);
+  const libraries = 12 * clamp01(Math.log10(Math.max(1, dependencies)) / 2);
+  return Math.round(size + breadth + parts + polyglot + libraries);
+}
+
+function tierOf(complexity, modules) {
+  if (modules >= 3 && complexity >= 45) return 'campus';
+  if (complexity >= 65) return 'tower';
+  if (complexity >= 40) return 'office';
+  if (complexity >= 15) return 'house';
   return 'cottage';
 }
 
@@ -121,13 +181,15 @@ function readProfile(folder) {
   const mavenModules = (rootPom.match(/<module>/g) || []).length;
   const childProjects = children.filter((dir) => PROJECT_MANIFESTS.some((name) => fs.existsSync(path.join(dir, name)))).length;
   const modules = Math.max(mavenModules, childProjects);
-  const { sourceFiles, hasTests } = walkSources(folder);
+  const { sourceFiles, codeLines, languages, hasTests } = walkSources(folder);
   const features = FEATURE_PATTERNS.filter(([, pattern]) => pattern.test(manifestText)).map(([name]) => name);
   if (hasAny(folders, CONTAINER_MARKERS)) features.push('containers');
   if (hasTests || /junit|jest|vitest|mocha|pytest|playwright|cypress|karma|jasmine|testng|mockito/.test(manifestText)) features.push('tests');
   if (hasAny([folder], CI_MARKERS)) features.push('ci');
   const ui = UI_PATTERN.test(manifestText) || hasAny(folders, ['angular.json', 'index.html']);
-  return { sourceFiles, modules, tier: tierOf(sourceFiles, modules), ui, features };
+  const dependencies = dependencyCount(folders);
+  const complexity = complexityOf({ codeLines, features, modules, languages, dependencies });
+  return { sourceFiles, codeLines, languages, dependencies, modules, complexity, tier: tierOf(complexity, modules), ui, features };
 }
 
 // Returns the cached profile right away (null on first sight) and refreshes it in the background.
