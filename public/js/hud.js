@@ -161,7 +161,7 @@ export function updateClock() {
   const light = state.light || lighting();
   const preview = state.timeOverride !== null && state.timeOverride !== undefined ? ' (preview)' : '';
   const text = `${light.phase}${preview} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  const clock = document.getElementById('cloud-sun');
+  const clock = document.getElementById('clock');
   if (clock.dataset.text === text) return;
   clock.dataset.text = text;
   clock.innerHTML = `${icon(light.icon)} ${escapeHtml(text)}`;
