@@ -148,13 +148,13 @@ export function problemLines(b) {
   const health = buildingHealth(b);
   // In a clan's town a check names the member it belongs to, and carries no command.
   const lines = health.failing.map((check) => {
-    const parts = [`⚠ ${check.kind === 'tests' ? 'Tests' : 'Build'} failing`, check.command, `${duration(Date.now() - check.ts)} ago`, check.owner || agentName(check.agentId)];
-    return { tone: 'bad', agentId: check.agentId, text: parts.filter(Boolean).join(' · ') };
+    const parts = [`${check.kind === 'tests' ? 'Tests' : 'Build'} failing`, check.command, `${duration(Date.now() - check.ts)} ago`, check.owner || agentName(check.agentId)];
+    return { tone: 'bad', icon: 'warning-diamond', agentId: check.agentId, text: parts.filter(Boolean).join(' · ') };
   });
-  if (health.errors) lines.push({ tone: health.smoking ? 'bad' : 'muted', text: `💨 ${health.errors} tool error${health.errors > 1 ? 's' : ''} in the last hour` });
+  if (health.errors) lines.push({ tone: health.smoking ? 'bad' : 'muted', icon: 'bug', text: `${health.errors} tool error${health.errors > 1 ? 's' : ''} in the last hour` });
   for (const agentId of b.project.waitingIds || []) {
     const owner = state.workers.get(agentId)?.agent.owner;
-    lines.push({ tone: 'wait', agentId, text: `🙋 ${agentName(agentId)} is waiting on ${owner || 'you'}` });
+    lines.push({ tone: 'wait', icon: 'circle-question', agentId, text: `${agentName(agentId)} is waiting on ${owner || 'you'}` });
   }
   return lines;
 }

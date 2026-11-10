@@ -18,6 +18,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #2d4a2b; color: var(--cream); }
 body { font-family: 'VT323', monospace; font-size: 20px; user-select: none; }
+/* Pixel icons (public/icons.svg) take the text colour. Sizes are multiples of their 12px grid so pixels stay square. */
+.i { width: 1em; height: 1em; flex: none; vertical-align: -0.15em; fill: currentColor; shape-rendering: crispEdges; }
+.btn .i, .label .i, .toast .i, .chip .i { width: 12px; height: 12px; vertical-align: -2px; }
+#toolbar .btn .i { width: 24px; height: 24px; vertical-align: middle; }
 canvas#world { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: grab; }
 canvas#world.dragging { cursor: grabbing; }
 .px { font-family: 'Press Start 2P', monospace; }
@@ -63,7 +67,7 @@ canvas#world.dragging { cursor: grabbing; }
 #chronicle:not(.expanded) { padding: 6px 40px 6px 12px; }
 #chronicle:not(.expanded) ul { margin: 0; }
 .chev { position: absolute; right: 8px; top: 6px; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
-#toolbar .btn { width: 38px; height: 38px; padding: 0; font-size: 17px; font-family: -apple-system, 'Apple Color Emoji', sans-serif; }
+#toolbar .btn { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 #toolbar #btnSpeed { font-family: 'Press Start 2P', monospace; font-size: 9px; }
 
 #clock { font-size: 22px; margin-top: 4px; }

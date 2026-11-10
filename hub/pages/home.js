@@ -14,6 +14,11 @@ let armedLeave = { clanId: '', until: 0 };
 let armedBlock = { userId: '', until: 0 };
 let waitingTimer = null;
 
+// A pixel icon from the town's /icons.svg (this page can't import the town's utils, which read town-only meta tags).
+function icon(name) {
+  return `<svg class="i" aria-hidden="true"><use href="/icons.svg#${name}"></use></svg>`;
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -27,11 +32,11 @@ function ago(ts) {
   return hours < 48 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
 
-function toast(text, variant = 'info') {
+function toast(text, variant = 'info', iconName = '') {
   const box = document.getElementById('toasts');
   const item = document.createElement('div');
   item.className = `toast ${variant}`;
-  item.textContent = text;
+  item.innerHTML = `${iconName ? `${icon(iconName)} ` : ''}${escapeHtml(text)}`;
   box.appendChild(item);
   setTimeout(() => item.remove(), 4500);
 }
@@ -44,16 +49,16 @@ async function call(method, path, body) {
   });
   const result = await response.json().catch(() => ({ ok: false, message: 'The hub did not answer.' }));
   if (!response.ok) {
-    toast(`⚠ ${result.message || 'Something went wrong.'}`, '');
+    toast(result.message || 'Something went wrong.', '', 'warning-diamond');
     return null;
   }
   return result;
 }
 
 function memberChip(clan, member, isLeader) {
-  const crown = member.role === 'leader' ? '👑 ' : '';
+  const crown = member.role === 'leader' ? `${icon('crown')} ` : '';
   const remove = isLeader && member.login !== me.user.login
-    ? `<button data-remove="${escapeHtml(member.login)}" data-clan="${escapeHtml(clan.id)}" title="Remove ${escapeHtml(member.login)} from the clan" aria-label="Remove ${escapeHtml(member.login)}">✕</button>`
+    ? `<button data-remove="${escapeHtml(member.login)}" data-clan="${escapeHtml(clan.id)}" title="Remove ${escapeHtml(member.login)} from the clan" aria-label="Remove ${escapeHtml(member.login)}">${icon('close')}</button>`
     : '';
   return `<span class="member ${member.role}">${crown}${escapeHtml(member.login)}${remove}</span>`;
 }
@@ -96,7 +101,7 @@ async function renderDevices() {
 
 function personRow(person) {
   const name = person.name && person.name !== person.login ? ` <span class="dim">${escapeHtml(person.name)}</span>` : '';
-  const crown = person.admin ? '👑 ' : '';
+  const crown = person.admin ? `${icon('crown')} ` : '';
   const letIn = person.admin ? 'hub admin' : HOW_LET_IN[person.approvedBy] || '';
   const how = person.status === 'approved' || person.admin
     ? `<span class="dim">${letIn}</span>`

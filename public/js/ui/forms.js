@@ -2,7 +2,7 @@
 import { API_TOKEN, CLAN_ID, FLOOR_H } from '../config.js';
 import { addToast } from '../hud.js';
 import { state } from '../state.js';
-import { escapeHtml, money } from '../utils.js';
+import { escapeHtml, icon, money } from '../utils.js';
 import { problemLines } from '../buildings.js';
 import { selectWorker } from './sheet.js';
 
@@ -15,10 +15,10 @@ export async function api(path, body, quiet = false) {
       body: JSON.stringify(body || {}),
     });
     const result = await response.json();
-    if (!result.ok && !quiet) addToast(`⚠ ${result.message}`);
+    if (!result.ok && !quiet) addToast(result.message, '', 'warning-diamond');
     return result;
   } catch {
-    if (!quiet) addToast('⚠ Could not reach the colony server');
+    if (!quiet) addToast('Could not reach the colony server', '', 'warning-diamond');
     return { ok: false };
   }
 }
@@ -29,7 +29,7 @@ let menuBuilding = null;
 function renderProblems(building) {
   const box = document.getElementById('ctxProblems');
   box.innerHTML = problemLines(building).map((problem) => {
-    const text = escapeHtml(problem.text);
+    const text = `${icon(problem.icon)} ${escapeHtml(problem.text)}`;
     const body = problem.agentId ? `<a data-agent="${escapeHtml(problem.agentId)}">${text}</a>` : text;
     return `<div class="problem ${problem.tone}">${body}</div>`;
   }).join('');
@@ -94,7 +94,7 @@ export async function openTerminalIn(project, command = '') {
   const result = await api('/api/terminal', { project, command });
   if (!result.ok) return false;
   if (command) rememberCommand(project, command);
-  addToast(command ? `⌨ Running in Terminal: ${command}` : `⌨ Terminal opened in ${project}`, 'info');
+  addToast(command ? `Running in Terminal: ${command}` : `Terminal opened in ${project}`, 'info', 'terminal');
   return true;
 }
 
@@ -141,7 +141,7 @@ function openHireForm(building) {
   const founding = !building;
   if (!founding) state.hireMode = 'hire';
   document.getElementById('whereBlock').classList.toggle('open', founding);
-  document.getElementById('hireTitle').textContent = founding ? '✨ NEW APP OR NEW CHAT' : `HIRE AN AGENT — ${building.name}`;
+  document.getElementById('hireTitle').innerHTML = founding ? `${icon('sparkles')} NEW APP OR NEW CHAT` : `HIRE AN AGENT — ${escapeHtml(building.name)}`;
   document.getElementById('hirePath').textContent = founding ? 'A new building rises for it in the town.' : `Works in ${building.project.path}`;
   const parentInput = document.getElementById('foundParent');
   if (founding && !parentInput.value) parentInput.value = state.data.defaults.projectsFolder;
@@ -177,7 +177,7 @@ document.getElementById('hireCancel').onclick = closeHireForm;
 document.getElementById('hireGo').onclick = async () => {
   const brief = document.getElementById('hireBrief').value.trim();
   if (!brief) {
-    addToast('⚠ Write a quest brief first');
+    addToast('Write a quest brief first', '', 'warning-diamond');
     return;
   }
   const overBudget = state.data.totals.costToday >= state.budget;
@@ -202,6 +202,6 @@ document.getElementById('hireGo').onclick = async () => {
   document.getElementById('hireBrief').value = '';
   document.getElementById('foundName').value = '';
   closeHireForm();
-  addToast(founding ? `✨ New ${model} agent is starting the project` : `🧑‍🔧 New ${model} agent hired for ${menuBuilding.name}`, 'info');
+  addToast(founding ? `New ${model} agent is starting the project` : `New ${model} agent hired for ${menuBuilding.name}`, 'info', founding ? 'sparkles' : 'user-plus');
   state.pendingSelect = result.agentId;
 };

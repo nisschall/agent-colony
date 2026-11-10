@@ -5,18 +5,18 @@ import { state } from './state.js';
 
 // Keyframes across the day: tint colour and strength laid over the town, and how dark it is (0 day … 1 night).
 const SKY_KEYS = [
-  { hour: 0, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: '🌙' },
-  { hour: 4.5, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: '🌙' },
-  { hour: 5.5, rgb: [70, 50, 110], alpha: 0.38, dark: 0.75, phase: 'Dawn', icon: '🌄' },
-  { hour: 6.5, rgb: [255, 140, 100], alpha: 0.2, dark: 0.3, phase: 'Sunrise', icon: '🌅' },
-  { hour: 8, rgb: [255, 225, 180], alpha: 0.07, dark: 0, phase: 'Morning', icon: '🌤' },
-  { hour: 12, rgb: [255, 255, 255], alpha: 0, dark: 0, phase: 'Noon', icon: '☀️' },
-  { hour: 15, rgb: [255, 215, 150], alpha: 0.06, dark: 0, phase: 'Afternoon', icon: '🌤' },
-  { hour: 17.25, rgb: [255, 165, 80], alpha: 0.18, dark: 0.08, phase: 'Golden hour', icon: '🌇' },
-  { hour: 18.5, rgb: [235, 95, 85], alpha: 0.24, dark: 0.35, phase: 'Sunset', icon: '🌇' },
-  { hour: 19.5, rgb: [80, 55, 125], alpha: 0.4, dark: 0.7, phase: 'Dusk', icon: '🌆' },
-  { hour: 21, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: '🌙' },
-  { hour: 24, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: '🌙' },
+  { hour: 0, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: 'moon' },
+  { hour: 4.5, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: 'moon' },
+  { hour: 5.5, rgb: [70, 50, 110], alpha: 0.38, dark: 0.75, phase: 'Dawn', icon: 'cloud-moon' },
+  { hour: 6.5, rgb: [255, 140, 100], alpha: 0.2, dark: 0.3, phase: 'Sunrise', icon: 'cloud-sun' },
+  { hour: 8, rgb: [255, 225, 180], alpha: 0.07, dark: 0, phase: 'Morning', icon: 'cloud-sun' },
+  { hour: 12, rgb: [255, 255, 255], alpha: 0, dark: 0, phase: 'Noon', icon: 'sun' },
+  { hour: 15, rgb: [255, 215, 150], alpha: 0.06, dark: 0, phase: 'Afternoon', icon: 'cloud-sun' },
+  { hour: 17.25, rgb: [255, 165, 80], alpha: 0.18, dark: 0.08, phase: 'Golden hour', icon: 'sun' },
+  { hour: 18.5, rgb: [235, 95, 85], alpha: 0.24, dark: 0.35, phase: 'Sunset', icon: 'sun' },
+  { hour: 19.5, rgb: [80, 55, 125], alpha: 0.4, dark: 0.7, phase: 'Dusk', icon: 'cloud-moon' },
+  { hour: 21, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: 'moon' },
+  { hour: 24, rgb: [18, 22, 64], alpha: 0.55, dark: 1, phase: 'Night', icon: 'moon' },
 ];
 export const TIME_PRESETS = [
   { label: 'LIVE', hour: null },

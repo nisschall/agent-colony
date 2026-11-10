@@ -11,7 +11,7 @@ import { state } from './state.js';
 import { toggleCrew } from './ui/boards.js';
 import { closeBuildingMenu, closeHireForm, openBuildingMenu, openGroundMenu } from './ui/forms.js';
 import { closeSheet, selectWorker } from './ui/sheet.js';
-import { compact, escapeHtml, money, siteOf } from './utils.js';
+import { compact, escapeHtml, icon, money, siteOf } from './utils.js';
 
 let drag = null;
 
@@ -114,10 +114,10 @@ function buildingTooltip(building) {
   if (health.live.size) lines.push(`<span style="color:var(--gold)">Now editing ${[...health.live].map((l) => LAYER_LABELS[l]).join(', ')}</span>`);
   for (const problem of problemLines(building)) {
     const color = problem.tone === 'bad' ? 'var(--red)' : problem.tone === 'wait' ? 'var(--gold)' : 'var(--muted)';
-    lines.push(`<span style="color:${color}">${escapeHtml(problem.text)}</span>`);
+    lines.push(`<span style="color:${color}">${icon(problem.icon)} ${escapeHtml(problem.text)}</span>`);
   }
-  if (health.heavy) lines.push(`🏗 ${compact(p.linesToday)} lines changed today`);
-  if (health.quiet) lines.push(`🌿 Quiet for ${Math.floor((Date.now() - p.lastTs) / DAY_MS)} days`);
+  if (health.heavy) lines.push(`${icon('building')} ${compact(p.linesToday)} lines changed today`);
+  if (health.quiet) lines.push(`${icon('leaf')} Quiet for ${Math.floor((Date.now() - p.lastTs) / DAY_MS)} days`);
   if (!CLAN_ID) lines.push(muted('Right-click to hire an agent'));
   return lines.join('<br>');
 }
@@ -138,7 +138,7 @@ function updateHover(sx, sy) {
     html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status, a.owner)} · ${where}<br>${detail}`;
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
     if (a.status === 'waiting' && a.waitingAsk) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
-    if (a.summary) html += `<br><span style="color:var(--muted)">💬 ${escapeHtml(a.summary.text)}</span>`;
+    if (a.summary) html += `<br><span style="color:var(--muted)">${icon('message')} ${escapeHtml(a.summary.text)}</span>`;
   } else {
     html = buildingTooltip(hit.building);
   }

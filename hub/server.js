@@ -15,7 +15,7 @@ const REPORT_BODY = 1_000_000;
 const STREAM_MS = 2000;
 const JSON_TYPE = 'application/json';
 const PAGES_DIR = path.join(__dirname, 'pages');
-const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8' };
+const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml' };
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': JSON_TYPE });
@@ -244,7 +244,7 @@ function startHub(config) {
     if (pathname === '/home.js' && serveFile(res, PAGES_DIR, 'home.js')) return undefined;
     const clanPage = pathname.match(/^\/clans\/([\w-]+)$/);
     if (clanPage) return serveClanTown(req, res, clanPage[1], pathname);
-    if ((pathname === '/styles.css' || pathname.startsWith('/js/')) && serveFile(res, config.publicDir, pathname)) return undefined;
+    if ((pathname === '/styles.css' || pathname === '/icons.svg' || pathname.startsWith('/js/')) && serveFile(res, config.publicDir, pathname)) return undefined;
     throw new ApiError(404, 'Not found.');
   }
 

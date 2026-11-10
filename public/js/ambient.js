@@ -143,7 +143,7 @@ export function updateAmbient(dt) {
     state.birds = Array.from({ length: size }, (_, i) => ({ x: -20 - i * 9, y: y + (i % 2) * 7 - i * 2, vx: 55, phase: i }));
   }
   const storming = recentErrorCount() >= ERROR_STORM_THRESHOLD;
-  if (storming && !state.storming) addToast(`🌧 Error storm: ${recentErrorCount()} errors in the last 15 minutes`);
+  if (storming && !state.storming) addToast(`Error storm: ${recentErrorCount()} errors in the last 15 minutes`, '', 'zap');
   state.storming = storming;
 }
 

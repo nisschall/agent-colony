@@ -1,19 +1,19 @@
 // The agent card: whether it needs you, its task, activity and files, and (expanded) a conversation you can type into.
 import { CLAN_ID } from '../config.js';
-import { addToast, autonomy, statusLabel } from '../hud.js';
+import { STATUS, addToast, autonomy, statusLabel } from '../hud.js';
 import { efficiency, levelOf, levelProgress, prettyModel, xpOf } from '../identity.js';
 import { HIRED_MARK, drawPerson } from '../people.js';
 import { sendAway } from '../simulation.js';
 import { state } from '../state.js';
 import { api, openTerminalIn } from '../ui/forms.js';
-import { clockTime, compact, duration, escapeHtml, money } from '../utils.js';
+import { clockTime, compact, duration, escapeHtml, icon, money } from '../utils.js';
 
 const DETAILS_REFRESH_MS = 3000;
 const COMPACT_ACTIVITY = 5;
 const COMPACT_FILES = 6;
 const WATCH_ONLY = 'Watch-only: this agent lives in the Claude app, so reply to it there.';
 const RELEASE_CONFIRM_MS = 4000;
-const RELEASE_LABEL = '👋 RELEASE';
+const RELEASE_LABEL = `${icon('logout')} RELEASE`;
 
 const sheet = document.getElementById('sheet');
 const thread = document.getElementById('chatThread');
@@ -38,7 +38,7 @@ export function renderSheet() {
   const hiredNote = agent.portal ? ` · ${HIRED_MARK} hired from the town` : agent.owner ? ` · ${agent.owner}'s agent` : '';
   document.getElementById('sheetName').textContent = worker.look.name;
   document.getElementById('sheetClass').textContent = `${prettyModel(agent.model)} ${worker.look.className}${hiredNote}`;
-  document.getElementById('sheetLevel').textContent = `${agent.project} · ${statusLabel(agent.status, agent.owner)}`;
+  document.getElementById('sheetLevel').innerHTML = `${escapeHtml(agent.project)} · ${statusLabel(agent.status, agent.owner)}`;
   renderStateLine(agent);
   renderTask(agent);
   renderStats(agent);
@@ -59,32 +59,32 @@ function stateLine(agent) {
   const doing = agent.lastAction || 'getting started';
   if (portal && portal.running) {
     const runningFor = portal.startedAt ? ` for ${duration(now - portal.startedAt)}` : '';
-    return { kind: 'working', text: `⚒ Working${runningFor} · ${doing}` };
+    return { kind: 'working', icon: 'tools', text: `Working${runningFor} · ${doing}` };
   }
   const outcome = portal && portal.outcome;
-  if (outcome && outcome.state === 'needs-you') return { kind: 'needs', text: `🙋 Needs you · ${outcome.summary}` };
-  if (outcome) return { kind: 'done', text: `✓ Done ${duration(now - outcome.ts)} ago · ready for the next task` };
+  if (outcome && outcome.state === 'needs-you') return { kind: 'needs', icon: 'circle-question', text: `Needs you · ${outcome.summary}` };
+  if (outcome) return { kind: 'done', icon: 'check', text: `Done ${duration(now - outcome.ts)} ago · ready for the next task` };
   if (agent.status === 'waiting' && agent.owner) {
     const question = agent.waitingAsk ? ` · ${agent.waitingAsk}` : '';
-    return { kind: 'needs', text: `🙋 Waiting on ${agent.owner} for ${duration(now - agent.waitingSince)}${question}` };
+    return { kind: 'needs', icon: 'circle-question', text: `Waiting on ${agent.owner} for ${duration(now - agent.waitingSince)}${question}` };
   }
   if (agent.status === 'waiting') {
-    return { kind: 'needs', text: `🙋 Waiting on you for ${duration(now - agent.waitingSince)} · ${agent.waitingAsk}` };
+    return { kind: 'needs', icon: 'circle-question', text: `Waiting on you for ${duration(now - agent.waitingSince)} · ${agent.waitingAsk}` };
   }
-  if (agent.status === 'stuck' || agent.status === 'overworked') return { kind: 'trouble', text: `${statusLabel(agent.status)} · ${doing}` };
-  if (agent.status === 'working') return { kind: 'working', text: `⚒ Working · ${doing}` };
-  return { kind: '', text: `${statusLabel(agent.status)} · last active ${duration(now - agent.lastTs)} ago` };
+  if (agent.status === 'stuck' || agent.status === 'overworked') return { kind: 'trouble', icon: STATUS[agent.status].icon, text: `${STATUS[agent.status].text} · ${doing}` };
+  if (agent.status === 'working') return { kind: 'working', icon: 'tools', text: `Working · ${doing}` };
+  return { kind: '', icon: STATUS[agent.status].icon, text: `${STATUS[agent.status].text} · last active ${duration(now - agent.lastTs)} ago` };
 }
 
 function renderStateLine(agent) {
   const line = stateLine(agent);
   const element = document.getElementById('sheetState');
   element.className = `state-line ${line.kind}`;
-  element.textContent = line.text;
+  element.innerHTML = `${icon(line.icon)} ${escapeHtml(line.text)}`;
   // What the agent said it did at the end of its last turn.
   const summary = document.getElementById('sheetNow');
   summary.style.display = agent.summary ? '' : 'none';
-  summary.textContent = agent.summary ? `💬 ${agent.summary.text} · ${duration(Date.now() - agent.summary.ts)} ago` : '';
+  summary.innerHTML = agent.summary ? `${icon('message')} ${escapeHtml(agent.summary.text)} · ${duration(Date.now() - agent.summary.ts)} ago` : '';
 }
 
 function renderTask(agent) {
@@ -161,7 +161,7 @@ function renderActivity(agent) {
   const items = details.activity.slice(-limit).reverse();
   list.innerHTML = items.map((item) => (
     `<li class="${item.error ? 'error' : ''}" title="${escapeHtml(item.text)}">`
-    + `<span class="t">${clockTime(item.ts)}</span><span class="what">${item.error ? '✗ ' : ''}${escapeHtml(item.text)}</span></li>`
+    + `<span class="t">${clockTime(item.ts)}</span><span class="what">${item.error ? `${icon('close')} ` : ''}${escapeHtml(item.text)}</span></li>`
   )).join('') || '<li class="empty">No actions yet.</li>';
 }
 
@@ -206,7 +206,7 @@ function renderThread() {
     return;
   }
   thread.innerHTML = messages.map((message) => {
-    if (message.role === 'tool') return `<div class="msg tool" title="${escapeHtml(message.text)}">⚙ ${escapeHtml(message.text)}</div>`;
+    if (message.role === 'tool') return `<div class="msg tool" title="${escapeHtml(message.text)}">${icon('gear')} ${escapeHtml(message.text)}</div>`;
     if (message.role === 'note') return `<div class="msg note">${escapeHtml(message.text)}</div>`;
     const who = message.role === 'you' ? 'You' : 'Agent';
     const body = message.role === 'agent' ? simpleMarkdown(message.text) : escapeHtml(message.text);
@@ -254,7 +254,7 @@ async function sendMessage(message) {
   const result = await api(`/api/agents/${encodeURIComponent(state.selectedId)}/orders`, { message });
   if (!result.ok) return;
   ordersInput.value = '';
-  addToast('📋 Sent', 'info');
+  addToast('Sent', 'info', 'clipboard');
   refreshDetails();
 }
 
@@ -275,20 +275,20 @@ document.getElementById('btnRetry').onclick = async () => {
   if (!state.selectedId) return;
   const result = await api(`/api/agents/${encodeURIComponent(state.selectedId)}/retry`);
   if (!result.ok) return;
-  addToast('✓ Retrying with your approval', 'info');
+  addToast('Retrying with your approval', 'info', 'check');
   refreshDetails();
 };
 
 document.getElementById('btnTerminal').onclick = async () => {
   if (!state.selectedId) return;
   const result = await api(`/api/agents/${encodeURIComponent(state.selectedId)}/terminal`);
-  if (result.ok) addToast('💻 Opened in Terminal. Keep talking to it there.', 'info');
+  if (result.ok) addToast('Opened in Terminal. Keep talking to it there.', 'info', 'laptop');
 };
 
 document.getElementById('btnStop').onclick = async () => {
   if (!state.selectedId) return;
   const result = await api(`/api/agents/${encodeURIComponent(state.selectedId)}/stop`);
-  if (result.ok) addToast('✋ Agent stopped', 'info');
+  if (result.ok) addToast('Agent stopped', 'info', 'cancel');
 };
 
 // Release asks for a second click instead of a dialog: the wallpaper's web view doesn't show confirm() boxes.
@@ -303,20 +303,20 @@ document.getElementById('btnRelease').onclick = async (e) => {
     button.textContent = running ? 'STOP IT AND RELEASE?' : 'CLICK AGAIN TO RELEASE';
     button.classList.add('danger');
     setTimeout(() => {
-      button.textContent = RELEASE_LABEL;
+      button.innerHTML = RELEASE_LABEL;
       button.classList.remove('danger');
     }, RELEASE_CONFIRM_MS);
     return;
   }
   releaseArmedUntil = 0;
-  button.textContent = RELEASE_LABEL;
+  button.innerHTML = RELEASE_LABEL;
   button.classList.remove('danger');
   const result = await api(`/api/agents/${encodeURIComponent(agentId)}/release`);
   if (!result.ok) return;
   const name = state.workers.get(agentId)?.look.name || 'The agent';
   sendAway(agentId);
   closeSheet();
-  addToast(`👋 ${name} was released. Its conversation stays in Claude's history.`, 'info');
+  addToast(`${name} was released. Its conversation stays in Claude's history.`, 'info', 'logout');
 };
 
 document.getElementById('sheetTask').onclick = (e) => e.currentTarget.classList.toggle('full');

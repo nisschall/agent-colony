@@ -17,12 +17,12 @@
 <div id="statusBar" class="panel" title="Click for details">
   <span class="seg" id="clanSeg"></span>
   <span class="seg" id="treasurySeg"><span class="coin" id="coin"></span><b id="treasuryAmount">$0.00</b><span class="dim">of <span id="budgetLabel">$50</span></span><span class="bar mini" id="budgetBar"><i style="width:0"></i></span></span>
-  <span class="seg" title="Working">⚒ <span id="popWorking">0</span></span>
-  <span class="seg" title="On a break">☕ <span id="popIdle">0</span></span>
-  <span class="seg" title="Asleep (quiet 45m+)">💤 <span id="popSleeping">0</span></span>
-  <span class="seg" title="Overworked" id="popHotWrap">🔥 <span id="popHot">0</span></span>
-  <span class="seg" title="Stuck (repeated errors)" id="popStuckWrap">❗ <span id="popStuck">0</span></span>
-  <span class="seg" title="Waiting on you — click to visit the first" id="popWaitWrap">🙋 <span id="popWait">0</span></span>
+  <span class="seg" title="Working"><svg class="i" aria-hidden="true"><use href="/icons.svg#tools"></use></svg> <span id="popWorking">0</span></span>
+  <span class="seg" title="On a break"><svg class="i" aria-hidden="true"><use href="/icons.svg#coffee"></use></svg> <span id="popIdle">0</span></span>
+  <span class="seg" title="Asleep (quiet 45m+)"><svg class="i" aria-hidden="true"><use href="/icons.svg#bed"></use></svg> <span id="popSleeping">0</span></span>
+  <span class="seg" title="Overworked" id="popHotWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#fire"></use></svg> <span id="popHot">0</span></span>
+  <span class="seg" title="Stuck (repeated errors)" id="popStuckWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#square-alert"></use></svg> <span id="popStuck">0</span></span>
+  <span class="seg" title="Waiting on you — click to visit the first" id="popWaitWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#circle-question"></use></svg> <span id="popWait">0</span></span>
   <span class="seg dim" id="clock">--:--</span>
 </div>
 
@@ -41,7 +41,7 @@
 </div>
 
 <div id="feed" class="panel">
-  <button class="feed-head" id="feedToggle" title="Show or hide agents' updates"><span class="label">📣 UPDATES</span><span class="count" id="feedCount"></span><span class="chev">▸</span></button>
+  <button class="feed-head" id="feedToggle" title="Show or hide agents' updates"><span class="label"><svg class="i" aria-hidden="true"><use href="/icons.svg#megaphone"></use></svg> UPDATES</span><span class="count" id="feedCount"></span><span class="chev">▸</span></button>
   <div class="feed-filters" id="feedFilters">
     <button class="chip on" data-filter="all">All</button>
     <button class="chip" data-filter="waiting">Waiting</button>
@@ -51,22 +51,22 @@
 </div>
 
 <div id="toolbar" class="panel">
-  <button class="btn" id="btnCrew" title="Today's crew">🎖</button>
-  <button class="btn" id="btnFame" title="Hall of fame">🏆</button>
-  <button class="btn" id="btnWard" title="Burnout ward">🚑</button>
-  <button class="btn" id="btnPause" title="Pause animation">⏸</button>
+  <button class="btn" id="btnCrew" title="Today's crew"><svg class="i" aria-hidden="true"><use href="/icons.svg#medal"></use></svg></button>
+  <button class="btn" id="btnFame" title="Hall of fame"><svg class="i" aria-hidden="true"><use href="/icons.svg#trophy"></use></svg></button>
+  <button class="btn" id="btnWard" title="Burnout ward"><svg class="i" aria-hidden="true"><use href="/icons.svg#battery-low"></use></svg></button>
+  <button class="btn" id="btnPause" title="Pause animation"><svg class="i" aria-hidden="true"><use href="/icons.svg#pause"></use></svg></button>
   <button class="btn" id="btnSpeed" title="Animation speed">1x</button>
-  <button class="btn" id="btnHome" title="Show the whole town">⌂</button>
-  <button class="btn" id="btnTime" title="Time of day: LIVE">⏰</button>
-  <button class="btn" id="btnRebuild" title="Rebuild the town with a new layout">🎲</button>
-  <button class="btn" id="btnClans" title="Clans: share projects with your team">🛡</button>
-  <button class="btn" id="btnMembers" title="Clan members">👥</button>
+  <button class="btn" id="btnHome" title="Show the whole town"><svg class="i" aria-hidden="true"><use href="/icons.svg#home"></use></svg></button>
+  <button class="btn" id="btnTime" title="Time of day: LIVE"><svg class="i" aria-hidden="true"><use href="/icons.svg#cloud-sun"></use></svg></button>
+  <button class="btn" id="btnRebuild" title="Rebuild the town with a new layout"><svg class="i" aria-hidden="true"><use href="/icons.svg#dice"></use></svg></button>
+  <button class="btn" id="btnClans" title="Clans: share projects with your team"><svg class="i" aria-hidden="true"><use href="/icons.svg#shield"></use></svg></button>
+  <button class="btn" id="btnMembers" title="Clan members"><svg class="i" aria-hidden="true"><use href="/icons.svg#users"></use></svg></button>
 </div>
 
 <div id="sheet" class="panel">
   <div class="sheet-tools">
-    <button class="icon-btn" id="sheetExpand" title="Expand to talk to this agent">⤢</button>
-    <button class="icon-btn" id="sheetClose" title="Close">✕</button>
+    <button class="icon-btn" id="sheetExpand" title="Expand to talk to this agent"><svg class="i" aria-hidden="true"><use href="/icons.svg#expand"></use></svg></button>
+    <button class="icon-btn" id="sheetClose" title="Close"><svg class="i" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
   </div>
   <div id="sheetInfo">
     <div class="head">
@@ -93,7 +93,7 @@
     <div id="blockedBox">
       <div class="label section">BLOCKED — NEEDS YOUR OK</div>
       <ul class="blocked" id="blockedList"></ul>
-      <button class="btn" id="btnRetry" title="Re-run it with only these actions allowed, for one run">✓ ALLOW ONCE &amp; RETRY</button>
+      <button class="btn" id="btnRetry" title="Re-run it with only these actions allowed, for one run"><svg class="i" aria-hidden="true"><use href="/icons.svg#check"></use></svg> ALLOW ONCE &amp; RETRY</button>
     </div>
     <div class="label section">ACTIVITY</div>
     <ul class="activity" id="sheetActivity"></ul>
@@ -121,10 +121,10 @@
     <div class="sheet-buttons">
       <button class="btn" id="btnOrders">SEND</button>
       <button class="btn" id="btnFollow">FOLLOW</button>
-      <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal">💻 TERMINAL</button>
-      <button class="btn" id="btnShell" title="A new Terminal window in this agent's project folder">⌨ SHELL</button>
+      <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal"><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"></use></svg> TERMINAL</button>
+      <button class="btn" id="btnShell" title="A new Terminal window in this agent's project folder"><svg class="i" aria-hidden="true"><use href="/icons.svg#terminal"></use></svg> SHELL</button>
       <button class="btn danger" id="btnStop">STOP</button>
-      <button class="btn" id="btnRelease" title="Send it out of town. Its conversation stays in Claude's history.">👋 RELEASE</button>
+      <button class="btn" id="btnRelease" title="Send it out of town. Its conversation stays in Claude's history."><svg class="i" aria-hidden="true"><use href="/icons.svg#logout"></use></svg> RELEASE</button>
     </div>
   </div>
 </div>
@@ -132,18 +132,18 @@
 <div id="ctxMenu" class="panel">
   <div class="label" id="ctxTitle"></div>
   <div id="ctxProblems"></div>
-  <button class="btn" id="ctxHire">🧑‍🔧 HIRE AGENT HERE</button>
-  <button class="btn" id="ctxZoom">🔍 ZOOM IN</button>
-  <button class="btn" id="ctxShell" title="A new Terminal window in this project's folder">⌨ OPEN TERMINAL HERE</button>
+  <button class="btn" id="ctxHire"><svg class="i" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> HIRE AGENT HERE</button>
+  <button class="btn" id="ctxZoom"><svg class="i" aria-hidden="true"><use href="/icons.svg#zoom-in"></use></svg> ZOOM IN</button>
+  <button class="btn" id="ctxShell" title="A new Terminal window in this project's folder"><svg class="i" aria-hidden="true"><use href="/icons.svg#terminal"></use></svg> OPEN TERMINAL HERE</button>
   <form id="ctxRun">
     <input id="ctxCommand" placeholder="Run a command here…" aria-label="Command to run in this project's folder" autocomplete="off" spellcheck="false">
-    <button class="btn" type="submit" title="Runs it in a new Terminal window in this folder">▶ RUN</button>
+    <button class="btn" type="submit" title="Runs it in a new Terminal window in this folder"><svg class="i" aria-hidden="true"><use href="/icons.svg#play"></use></svg> RUN</button>
   </form>
   <div id="ctxRecent"></div>
 </div>
 
 <div id="groundMenu" class="panel">
-  <button class="btn" id="groundFound">✨ NEW APP / NEW CHAT</button>
+  <button class="btn" id="groundFound"><svg class="i" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> NEW APP / NEW CHAT</button>
 </div>
 
 <div id="hire" class="panel">
@@ -180,7 +180,7 @@
   <div class="note warn" id="hireBudget"></div>
   <div class="row-buttons">
     <button class="btn" id="hireCancel">CANCEL</button>
-    <button class="btn" id="hireGo">🧑‍🔧 HIRE</button>
+    <button class="btn" id="hireGo"><svg class="i" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> HIRE</button>
   </div>
 </div>
 
@@ -192,14 +192,14 @@
 
 <div id="crew" class="panel">
   <span class="close" id="crewClose">X</span>
-  <h2 id="crewTitle">🎖 TODAY'S CREW</h2>
+  <h2 id="crewTitle"><svg class="i" aria-hidden="true"><use href="/icons.svg#medal"></use></svg> TODAY'S CREW</h2>
   <div class="crew-summary" id="crewSummary"></div>
   <div class="crew-grid" id="crewGrid"></div>
 </div>
 
 <div id="clans" class="panel">
   <span class="close" id="clansClose">X</span>
-  <h2>🛡 CLANS</h2>
+  <h2><svg class="i" aria-hidden="true"><use href="/icons.svg#shield"></use></svg> CLANS</h2>
   <div id="clansBody"></div>
 </div>
 

@@ -9,7 +9,7 @@ import { HIRED_MARK, HIRED_VEST, drawPerson } from '../people.js';
 import { state } from '../state.js';
 import { api } from '../ui/forms.js';
 import { renderSheet, selectWorker } from '../ui/sheet.js';
-import { clockTime, compact, duration, escapeHtml, money } from '../utils.js';
+import { clockTime, compact, duration, escapeHtml, icon, money } from '../utils.js';
 
 export function renderBoard(mode) {
   state.boardMode = mode;
@@ -21,7 +21,7 @@ export function renderBoard(mode) {
     return;
   }
   if (mode === 'fame') {
-    document.getElementById('boardTitle').textContent = '🏆 HALL OF FAME — last 24h';
+    document.getElementById('boardTitle').innerHTML = `${icon('trophy')} HALL OF FAME — last 24h`;
     agents.sort((a, b) => xpOf(b) - xpOf(a));
     rows = agents.map((a, i) => {
       const look = identity(a);
@@ -31,7 +31,7 @@ export function renderBoard(mode) {
     });
     board.querySelector('#boardBody').innerHTML = `<table><tr><th>#</th><th>AGENT</th><th>GUILD</th><th class="num">LV</th><th class="num">BRICKS</th><th class="num">GOLD</th><th class="num">BRICKS/$</th></tr>${rows.join('')}</table>`;
   } else {
-    document.getElementById('boardTitle').textContent = '🚑 BURNOUT WARD — most stressed first';
+    document.getElementById('boardTitle').innerHTML = `${icon('battery-low')} BURNOUT WARD — most stressed first`;
     agents.sort((a, b) => b.stress - a.stress);
     rows = agents.map((a) => {
       const look = identity(a);
@@ -52,7 +52,7 @@ export function renderBoard(mode) {
 // A clan's members: who is online, how many agents they have here, and how many are waiting on them.
 function renderMembers(board) {
   const clan = state.data && state.data.clan;
-  document.getElementById('boardTitle').textContent = `👥 ${clan ? clan.name.toUpperCase() : 'CLAN'} — MEMBERS`;
+  document.getElementById('boardTitle').innerHTML = `${icon('users')} ${escapeHtml(clan ? clan.name.toUpperCase() : 'CLAN')} — MEMBERS`;
   const members = clan ? clan.members.slice().sort((a, b) => b.waiting - a.waiting || b.online - a.online || b.agents - a.agents) : [];
   const rows = members.map((m) => {
     const seen = m.online ? '<span style="color:var(--green)">● online</span>' : `<span style="color:var(--muted)">${m.lastSeen ? `seen ${duration(Date.now() - m.lastSeen)} ago` : 'not linked yet'}</span>`;
@@ -120,7 +120,7 @@ export function renderCrew() {
   const mvpId = crew.length ? crew.slice().sort((a, b) => b.score - a.score)[0].agent.id : null;
   const dateLabel = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
 
-  document.getElementById('crewTitle').textContent = `🎖 TODAY'S CREW — ${dateLabel}`;
+  document.getElementById('crewTitle').innerHTML = `${icon('medal')} TODAY'S CREW — ${escapeHtml(dateLabel)}`;
   document.getElementById('crewSummary').innerHTML = [
     `Crew <b>${crew.length}</b>`,
     `On the job <b>${crew.filter((c) => BUSY_STATUSES.includes(c.agent.status)).length}</b>`,
@@ -155,14 +155,14 @@ function crewCard(agent, isMvp) {
   const statsHtml = stats.map(([k, v]) => `<div><span>${k}</span><b>${escapeHtml(v)}</b></div>`).join('');
   const quest = agent.title || `work on ${agent.project}`;
   return `<div class="card ${agent.status}" data-id="${escapeHtml(agent.id)}">`
-    + (isMvp ? '<span class="ribbon">⭐ MVP</span>' : '')
+    + (isMvp ? `<span class="ribbon">${icon('star')} MVP</span>` : '')
     + `<div class="top"><canvas width="28" height="28" data-portrait="${escapeHtml(agent.id)}"></canvas><div>`
     + `<div class="name">${agent.portal ? `<span style="color:${HIRED_VEST}">${HIRED_MARK}</span> ` : ''}${escapeHtml(look.name)}</div>`
     + `<div class="cls">${escapeHtml(prettyModel(agent.model))} ${escapeHtml(look.className)} · LV ${levelOf(xpOf(agent))}</div>`
     + `<span class="badge ${agent.status}">${statusLabel(agent.status)}</span>`
-    + (YOU.revieweeId === agent.id ? '<span class="badge review">📋 Your focus</span>' : '')
+    + (YOU.revieweeId === agent.id ? `<span class="badge review">${icon('clipboard')} Your focus</span>` : '')
     + '</div></div>'
-    + `<div class="quest">${agent.status === 'waiting' ? `🙋 “${escapeHtml(agent.waitingAsk)}”` : `“${escapeHtml(quest)}”`}</div>`
+    + `<div class="quest">${agent.status === 'waiting' ? `${icon('circle-question')} “${escapeHtml(agent.waitingAsk)}”` : `“${escapeHtml(quest)}”`}</div>`
     + `<div class="guild">Guild: ${escapeHtml(agent.project)}</div>`
     + `<div class="bar ${energyClass}" title="Energy"><i style="width:${energy}%"></i></div>`
     + `<div class="stats">${statsHtml}</div></div>`;
@@ -242,7 +242,7 @@ document.getElementById('boardBody').addEventListener('click', (e) => {
 });
 document.getElementById('btnPause').onclick = (e) => {
   state.paused = !state.paused;
-  e.currentTarget.textContent = state.paused ? '▶' : '⏸';
+  e.currentTarget.innerHTML = icon(state.paused ? 'play' : 'pause');
   e.currentTarget.classList.toggle('on', state.paused);
 };
 document.getElementById('btnSpeed').onclick = (e) => {
@@ -266,5 +266,5 @@ document.getElementById('btnRebuild').onclick = () => window.colonyRebuildTown()
 window.colonyRebuildTown = async () => {
   if (!confirm('Rebuild the town with a new layout? Every project keeps its building; plots, streets and the park are rearranged.')) return;
   const result = await api('/api/town/rebuild', { seed: LAYOUT_SEED });
-  if (result.ok) addToast('🎲 Rebuilding the town…', 'info');
+  if (result.ok) addToast('Rebuilding the town…', 'info', 'dice');
 };

@@ -52,10 +52,10 @@ function syncBuildings(projects) {
     const measuredBefore = building.tier !== '';
     if (measuredBefore && tier && tier !== building.tier) {
       building.bump = 1;
-      addToast(`🏗 ${project.name} became ${TIERS[tier].article} ${TIERS[tier].label.toLowerCase()}!`, 'info');
+      addToast(`${project.name} became ${TIERS[tier].article} ${TIERS[tier].label.toLowerCase()}!`, 'info', 'building');
     } else if (measuredBefore && floors > building.floors) {
       building.bump = 1;
-      addToast(`🏗 ${project.name} grew to ${floors} floors!`, 'info');
+      addToast(`${project.name} grew to ${floors} floors!`, 'info', 'building');
     }
     building.tier = tier;
     building.addons = addonsFor(project);
@@ -135,14 +135,14 @@ function reactToChanges(worker, before, after) {
   if (after.status !== before.status) {
     const look = identity(after);
     if (after.status === 'overworked') {
-      addToast(`🔥 ${look.name} @ ${after.project} is burning out!`);
+      addToast(`${look.name} @ ${after.project} is burning out!`, '', 'fire');
       addChronicle({ ts: Date.now(), kind: 'alarm', agentId: after.id, text: 'is overworked — consider a break' });
     }
     if (after.status === 'stuck') {
-      addToast(`❗ ${look.name} @ ${after.project} is stuck on errors`);
+      addToast(`${look.name} @ ${after.project} is stuck on errors`, '', 'square-alert');
       addChronicle({ ts: Date.now(), kind: 'alarm', agentId: after.id, text: 'keeps hitting errors' });
     }
-    if (after.status === 'waiting') addToast(`🙋 ${look.name} @ ${after.project} ${after.owner ? `is waiting on ${after.owner}` : 'needs your review'}`, 'info');
+    if (after.status === 'waiting') addToast(`${look.name} @ ${after.project} ${after.owner ? `is waiting on ${after.owner}` : 'needs your review'}`, 'info', 'circle-question');
   }
   if (after.lastHumanTs > before.lastHumanTs) {
     addFloater(worker.x, worker.y - 26, '📋 new orders', '#6cc4ff');

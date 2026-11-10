@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { renderBoard, renderCrew } from './ui/boards.js';
 import { renderFeed } from './ui/feed.js';
 import { selectWorker } from './ui/sheet.js';
-import { clockTime, compact, escapeHtml, money, saveBudget } from './utils.js';
+import { clockTime, compact, escapeHtml, icon, money, saveBudget } from './utils.js';
 
 const chronicle = [];
 
@@ -43,11 +43,11 @@ document.getElementById('chronicleList').addEventListener('click', (e) => {
   if (item && state.workers.has(item.dataset.id)) selectWorker(item.dataset.id, true);
 });
 
-export function addToast(text, variant) {
+export function addToast(text, variant = '', iconName = '') {
   const box = document.getElementById('toasts');
   const toast = document.createElement('div');
-  toast.className = `toast ${variant || ''}`;
-  toast.textContent = text;
+  toast.className = `toast ${variant}`;
+  toast.innerHTML = `${iconName ? `${icon(iconName)} ` : ''}${escapeHtml(text)}`;
   box.appendChild(toast);
   setTimeout(() => toast.remove(), 4500);
   while (box.children.length > 3) box.firstChild.remove();
@@ -68,7 +68,7 @@ let lastCostToday = null;
 
 function renderClanSeg(clan) {
   const online = clan.members.filter((member) => member.online).length;
-  document.getElementById('clanSeg').innerHTML = `🛡 <b>${escapeHtml(clan.name)}</b><span class="dim">${online}/${clan.members.length} online</span>`;
+  document.getElementById('clanSeg').innerHTML = `${icon('shield')} <b>${escapeHtml(clan.name)}</b><span class="dim">${online}/${clan.members.length} online</span>`;
   document.getElementById('popWaitWrap').title = clan.waitingOn.length
     ? `Waiting on ${clan.waitingOn.map((w) => `${w.login} (${w.count})`).join(', ')} — click to visit the first`
     : 'Nobody is being waited on';
@@ -118,9 +118,20 @@ export function renderHud() {
   if (document.getElementById('crew').classList.contains('open')) renderCrew();
 }
 
+export const STATUS = {
+  working: { icon: 'tools', text: 'Working' },
+  idle: { icon: 'coffee', text: 'On break' },
+  sleeping: { icon: 'bed', text: 'Asleep' },
+  overworked: { icon: 'fire', text: 'Overworked' },
+  stuck: { icon: 'square-alert', text: 'Stuck' },
+  waiting: { icon: 'circle-question', text: 'Waiting on you' },
+};
+
+// HTML: the status's icon and words.
 export function statusLabel(status, owner) {
-  if (status === 'waiting' && owner) return `🙋 Waiting on ${owner}`;
-  return { working: '⚒ Working', idle: '☕ On break', sleeping: '💤 Asleep', overworked: '🔥 Overworked', stuck: '❗ Stuck', waiting: '🙋 Waiting on you' }[status];
+  const { icon: iconName, text } = STATUS[status];
+  const words = status === 'waiting' && owner ? `Waiting on ${owner}` : text;
+  return `${icon(iconName)} ${escapeHtml(words)}`;
 }
 
 export function autonomy(agent) {
@@ -149,7 +160,9 @@ export function updateClock() {
   const now = new Date();
   const light = state.light || lighting();
   const preview = state.timeOverride !== null && state.timeOverride !== undefined ? ' (preview)' : '';
-  const text = `${light.icon} ${light.phase}${preview} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  const clock = document.getElementById('clock');
-  if (clock.textContent !== text) clock.textContent = text;
+  const text = `${light.phase}${preview} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const clock = document.getElementById('cloud-sun');
+  if (clock.dataset.text === text) return;
+  clock.dataset.text = text;
+  clock.innerHTML = `${icon(light.icon)} ${escapeHtml(text)}`;
 }

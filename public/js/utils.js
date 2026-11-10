@@ -57,6 +57,11 @@ export function saveBudget(value) {
   try { localStorage.setItem(BUDGET_KEY, String(value)); } catch { /* storage unavailable */ }
 }
 
+// A pixel icon from /icons.svg, drawn in the colour of the text around it.
+export function icon(name) {
+  return `<svg class="i" aria-hidden="true"><use href="/icons.svg#${name}"></use></svg>`;
+}
+
 export function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

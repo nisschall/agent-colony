@@ -1,10 +1,10 @@
-// The 🛡 Clans panel: link this Mac to a clan hub, choose which projects each clan sees, and open clan towns.
+// The Clans panel: link this Mac to a clan hub, choose which projects each clan sees, and open clan towns.
 // In a clan's own town (served by the hub) the same button goes back to the hub's list of your clans.
 import { CLAN_ID } from '../config.js';
 import { addToast } from '../hud.js';
 import { state } from '../state.js';
 import { api } from './forms.js';
-import { duration, escapeHtml } from '../utils.js';
+import { duration, escapeHtml, icon } from '../utils.js';
 
 const HUB_KEY = 'agentColony.hub';
 const UPDATES_NOTE = 'Adds what your agents say at the end of each turn, and the questions they ask you, for shared projects only. '
@@ -46,7 +46,7 @@ function linkForm(broken) {
   return `${intro}
     <div class="field"><div class="label">HUB ADDRESS</div><input id="clanHub" placeholder="https://colony.example.com" value="${escapeHtml(hub)}"></div>
     <div class="note" id="clanLinkNote">${LINK_NOTE}</div>
-    <div class="row-buttons"><a class="btn" id="clanLink" target="_blank" rel="noopener" aria-disabled="true">🔗 LINK WITH GITHUB</a></div>`;
+    <div class="row-buttons"><a class="btn" id="clanLink" target="_blank" rel="noopener" aria-disabled="true">${icon('link')} LINK WITH GITHUB</a></div>`;
 }
 
 // The sign-in link is made as soon as there is a hub address, so clicking it opens the hub straight away.
@@ -61,25 +61,25 @@ async function prepareLink() {
   if (!hub) return;
   const result = await api('/api/clan/link', { hub }, true);
   if (input.value.trim() !== hub) return;
-  note.textContent = result.ok ? LINK_NOTE : `⚠ ${result.message || 'Could not reach the colony server.'}`;
+  note.innerHTML = result.ok ? escapeHtml(LINK_NOTE) : `${icon('warning-diamond')} ${escapeHtml(result.message || 'Could not reach the colony server.')}`;
   if (!result.ok) return;
   link.href = result.url;
   link.removeAttribute('aria-disabled');
 }
 
 function pushLine() {
-  if (status.hubError) return `<span class="warn">⚠ Can't reach the hub: ${escapeHtml(status.hubError)}</span>`;
+  if (status.hubError) return `<span class="warn">${icon('warning-diamond')} Can't reach the hub: ${escapeHtml(status.hubError)}</span>`;
   const push = status.lastPush;
   if (!push.at) return '<span class="dim">Connecting to the hub…</span>';
   const age = Date.now() - push.at;
-  if (push.ok) return `<span class="ok">✓ Sharing · last sent ${age < 60000 ? 'just now' : `${duration(age)} ago`}</span>`;
-  return `<span class="warn">⚠ ${escapeHtml(push.message)}</span>`;
+  if (push.ok) return `<span class="ok">${icon('check')} Sharing · last sent ${age < 60000 ? 'just now' : `${duration(age)} ago`}</span>`;
+  return `<span class="warn">${icon('warning-diamond')} ${escapeHtml(push.message)}</span>`;
 }
 
 function clanRows() {
   if (!status.clans.length) return '<p class="dim">You are not in a clan yet. Create one or join with an invite code on the hub.</p>';
   return status.clans.map((clan) => `<div class="clan-row"><span>${escapeHtml(clan.name)}<span class="dim">${clan.role === 'leader' ? 'Leader' : 'Member'} · ${clan.members} member${clan.members === 1 ? '' : 's'}</span></span>`
-    + `${hubLink(`${status.hub}/clans/${encodeURIComponent(clan.id)}`, 'OPEN TOWN ↗')}</div>`).join('');
+    + `${hubLink(`${status.hub}/clans/${encodeURIComponent(clan.id)}`, `OPEN TOWN ${icon('external-link')}`)}</div>`).join('');
 }
 
 // Every project in your town, plus any shared project that isn't on a plot right now.
@@ -102,7 +102,7 @@ function linkedView() {
   return `<div class="linked-as"><span>Linked as <b>${who}</b> on ${escapeHtml(hubHost(status.hub))}</span><button class="btn danger" id="clanUnlink">UNLINK</button></div>
     <div class="note">${pushLine()}</div>
     <div class="section"><div class="label">YOUR CLANS</div>${clanRows()}
-      <div class="row-buttons">${hubLink(`${status.hub}/`, 'CREATE OR JOIN A CLAN ↗')}</div></div>
+      <div class="row-buttons">${hubLink(`${status.hub}/`, `CREATE OR JOIN A CLAN ${icon('external-link')}`)}</div></div>
     ${shareTable()}
     <div class="section"><label class="switch"><input type="checkbox" id="clanShareUpdates"${status.shareUpdates ? ' checked' : ''}> Share my agents' updates</label>
       <div class="note">${UPDATES_NOTE}</div></div>`;
@@ -122,7 +122,7 @@ function render() {
 async function refresh() {
   const result = await api('/api/clan/status', {}, true);
   status = result.ok ? result : { linked: false, broken: false, hub: '', user: null, clans: [], shares: {}, lastPush: { at: 0 } };
-  if (!result.ok && result.message) addToast(`⚠ ${result.message}`);
+  if (!result.ok && result.message) addToast(result.message, '', 'warning-diamond');
   render();
 }
 
@@ -149,7 +149,7 @@ body.addEventListener('click', async (e) => {
     document.getElementById('clanLinkNote').textContent = 'Finish signing in on the hub in your browser. This panel updates when you come back.';
   } else if (target.id === 'clanUnlink') {
     const result = await api('/api/clan/unlink', {});
-    if (result.ok) addToast('🛡 This Mac is no longer linked', 'info');
+    if (result.ok) addToast('This Mac is no longer linked', 'info', 'shield');
     refresh();
   }
 });
@@ -165,7 +165,7 @@ body.addEventListener('change', async (e) => {
     const result = await api('/api/clan/updates', { share: e.target.checked });
     if (result.ok) {
       status.shareUpdates = result.shareUpdates;
-      addToast(`🛡 ${result.message}`, 'info');
+      addToast(result.message, 'info', 'shield');
     } else {
       e.target.checked = !e.target.checked;
     }
@@ -201,7 +201,7 @@ if (CLAN_ID) {
     const url = new URL(location.href);
     url.searchParams.delete('clan');
     history.replaceState(null, '', url);
-    addToast('🛡 This Mac is linked. Choose which projects each clan sees.', 'info');
+    addToast('This Mac is linked. Choose which projects each clan sees.', 'info', 'shield');
     openClans();
   }
 }

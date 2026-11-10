@@ -101,9 +101,9 @@ async function handleApi(req, res) {
 
 const ACTION_MESSAGES = { orders: 'Orders sent.', retry: 'Retrying with your approval.', stop: 'Agent stopped.', release: 'Agent released.' };
 
-const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
 
-// Serves the page's scripts and stylesheet from public/, and nothing outside it.
+// Serves the page's scripts, stylesheet and icons from public/, and nothing outside it.
 function serveStatic(pathname, res) {
   const file = path.normalize(path.join(PUBLIC_DIR, pathname));
   const type = STATIC_TYPES[path.extname(file)];

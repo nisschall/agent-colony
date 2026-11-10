@@ -3,14 +3,14 @@
 // shows every member's agents (for members who share their updates); in your own town, your agents.
 import { CLAN_ID } from '../config.js';
 import { state } from '../state.js';
-import { duration, escapeHtml } from '../utils.js';
+import { duration, escapeHtml, icon } from '../utils.js';
 import { selectWorker } from './sheet.js';
 
 const FEED_KINDS = new Set(['update', 'waiting', 'broke', 'fixed']);
-const ICONS = { update: '💬', waiting: '🙋', broke: '⚠', fixed: '✓' };
+const ICONS = { update: 'message', waiting: 'circle-question', broke: 'warning-diamond', fixed: 'check' };
 const WAITING_PREFIXES = ['is waiting for your review: ', 'needs you: '];
 const GENERIC_WAITING = 'is waiting for review';
-const SHARE_HINT = 'Members turn on "Share my agents\' updates" in their town\'s 🛡 panel to post here.';
+const SHARE_HINT = `Members turn on "Share my agents' updates" in their town's ${icon('shield')} panel to post here.`;
 const COLLAPSED_ITEMS = 2;
 const EXPANDED_ITEMS = 50;
 const OPEN_KEY = 'agentColony.feedOpen';
@@ -63,7 +63,7 @@ function itemHtml(event) {
   return `<li class="${event.kind}${answered}" data-id="${escapeHtml(event.agentId || '')}" title="${escapeHtml(text)}">`
     + `<div class="meta"><span class="who">${escapeHtml(who)}</span><span class="where">${escapeHtml(event.project || '')}</span>`
     + `<span class="t">${duration(Date.now() - event.ts)}</span></div>`
-    + `<div class="what">${ICONS[event.kind]} ${escapeHtml(text)}</div></li>`;
+    + `<div class="what">${icon(ICONS[event.kind])} ${escapeHtml(text)}</div></li>`;
 }
 
 // An answered question with no text says nothing, so only open ones without text stay in the drawer.
@@ -85,7 +85,7 @@ export function renderFeed() {
   const events = feedEvents.filter(matches).sort((a, b) => b.ts - a.ts);
   const shown = events.slice(0, open ? EXPANDED_ITEMS : COLLAPSED_ITEMS);
   const nobodyShares = CLAN_ID && !feedEvents.some((e) => e.kind === 'update');
-  const hint = nobodyShares ? `<li class="empty">${escapeHtml(SHARE_HINT)}</li>` : '';
+  const hint = nobodyShares ? `<li class="empty">${SHARE_HINT}</li>` : '';
   document.getElementById('feedCount').textContent = events.length ? `${events.length}` : '';
   list.innerHTML = shown.map(itemHtml).join('') + hint || '<li class="empty">No updates yet today.</li>';
 }
