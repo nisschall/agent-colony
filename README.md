@@ -64,7 +64,6 @@ Open http://localhost:4747 (full game) or http://localhost:4747/?wallpaper (slim
 - Prices per model are in `server/pricing.js`; Codex rates are a placeholder.
 - Agents hired from the town may edit files in their project and run the commands in `ALLOWED_TOOLS` (`server/config.js`).
 
-## Privacy
 ## Clans
 
 A clan is a shared town: everyone's shared projects, their agents, who is waiting on whom, and recent activity, on a hub your team hosts (setup in [hub/README.md](hub/README.md)). You can be in several clans and pick which projects each one sees.
@@ -75,6 +74,7 @@ A clan is a shared town: everyone's shared projects, their agents, who is waitin
 
 Unlinking (in the panel, or on the hub's page) stops sharing straight away.
 
+## Privacy
 
 Everything stays on your Mac unless you link it to a clan hub. The server only listens on `127.0.0.1` and reads your local session logs. Once linked, it sends the hub a short summary of the projects you chose to share, and nothing about the others. That summary has no transcripts, prompts, code, commands or folder paths: the full list is in [hub/README.md](hub/README.md#what-members-share). `town.json`, `portal-agents.json` and `clan.json` (your layout, hired agents and hub link) are written next to the code and are not committed.
 
@@ -114,9 +114,9 @@ No npm dependencies and no build step: the server is plain Node, and the page lo
 | `server/portal.js` | Hiring agents, orders, retry, stop, release, Open in Terminal |
 | `server/conversation.js` | An agent's conversation, actions and changed files, for its card |
 | `server/checks.js` | Failing builds and tests, and recent errors, per project |
-| `server/town.js`, `server/pricing.js`, `server/config.js` | Layout seed, model prices, settings |
 | `server/clan.js` | Linking this Mac to a clan hub, choosing shared projects, sending the summary |
 | `hub/` | The clan hub: GitHub sign-in, approvals, clans, SQLite storage and deploy files (runs on a server, Node 22) |
+| `server/town.js`, `server/pricing.js`, `server/config.js` | Layout seed, model prices, settings |
 | `public/index.html`, `public/styles.css` | Page markup and styles |
 | `public/js/main.js` | Page entry point: wallpaper hooks, frame loop, start-up |
 | `public/js/sync.js`, `simulation.js` | Live data from the server; where agents go and how they move |

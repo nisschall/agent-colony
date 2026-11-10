@@ -22,9 +22,14 @@ function rememberHub(hub) {
   try { localStorage.setItem(HUB_KEY, hub); } catch { /* storage unavailable */ }
 }
 
-// The hub opens in your browser (from the wallpaper too), and sends you back here once you have signed in.
-function openOnHub(url) {
-  window.open(url, '_blank', 'noopener');
+const LINK_NOTE = 'You sign in with GitHub on the hub, then come back here. Nothing is shared until you choose projects.';
+const PREPARE_DELAY_MS = 400;
+let prepareTimer = null;
+
+// Hub pages open as plain links in a new window: browsers never block those, and the wallpaper hands
+// them to your default browser. (Opening a window after waiting on the server counts as a pop-up.)
+function hubLink(url, label, id = '') {
+  return `<a class="btn" target="_blank" rel="noopener"${id ? ` id="${id}"` : ''} href="${escapeHtml(url)}">${label}</a>`;
 }
 
 function hubHost(hub) {
@@ -38,8 +43,26 @@ function linkForm(broken) {
   const hub = broken ? status.hub : rememberedHub();
   return `${intro}
     <div class="field"><div class="label">HUB ADDRESS</div><input id="clanHub" placeholder="https://colony.example.com" value="${escapeHtml(hub)}"></div>
-    <div class="note">You sign in with GitHub on the hub, then come back here. Nothing is shared until you choose projects.</div>
-    <div class="row-buttons"><button class="btn" id="clanLink">🔗 LINK WITH GITHUB</button></div>`;
+    <div class="note" id="clanLinkNote">${LINK_NOTE}</div>
+    <div class="row-buttons"><a class="btn" id="clanLink" target="_blank" rel="noopener" aria-disabled="true">🔗 LINK WITH GITHUB</a></div>`;
+}
+
+// The sign-in link is made as soon as there is a hub address, so clicking it opens the hub straight away.
+async function prepareLink() {
+  const input = document.getElementById('clanHub');
+  const link = document.getElementById('clanLink');
+  const note = document.getElementById('clanLinkNote');
+  if (!input || !link) return;
+  const hub = input.value.trim();
+  link.removeAttribute('href');
+  link.setAttribute('aria-disabled', 'true');
+  if (!hub) return;
+  const result = await api('/api/clan/link', { hub }, true);
+  if (input.value.trim() !== hub) return;
+  note.textContent = result.ok ? LINK_NOTE : `⚠ ${result.message || 'Could not reach the colony server.'}`;
+  if (!result.ok) return;
+  link.href = result.url;
+  link.removeAttribute('aria-disabled');
 }
 
 function pushLine() {
@@ -54,7 +77,7 @@ function pushLine() {
 function clanRows() {
   if (!status.clans.length) return '<p class="dim">You are not in a clan yet. Create one or join with an invite code on the hub.</p>';
   return status.clans.map((clan) => `<div class="clan-row"><span>${escapeHtml(clan.name)}<span class="dim">${clan.role === 'leader' ? 'Leader' : 'Member'} · ${clan.members} member${clan.members === 1 ? '' : 's'}</span></span>`
-    + `<button class="btn" data-open="${escapeHtml(clan.id)}">OPEN TOWN ↗</button></div>`).join('');
+    + `${hubLink(`${status.hub}/clans/${encodeURIComponent(clan.id)}`, 'OPEN TOWN ↗')}</div>`).join('');
 }
 
 // Every project in your town, plus any shared project that isn't on a plot right now.
@@ -77,7 +100,7 @@ function linkedView() {
   return `<div class="linked-as"><span>Linked as <b>${who}</b> on ${escapeHtml(hubHost(status.hub))}</span><button class="btn danger" id="clanUnlink">UNLINK</button></div>
     <div class="note">${pushLine()}</div>
     <div class="section"><div class="label">YOUR CLANS</div>${clanRows()}
-      <div class="row-buttons"><button class="btn" id="clanHome">CREATE OR JOIN A CLAN ↗</button></div></div>
+      <div class="row-buttons">${hubLink(`${status.hub}/`, 'CREATE OR JOIN A CLAN ↗')}</div></div>
     ${shareTable()}`;
 }
 
@@ -86,8 +109,10 @@ function render() {
     body.innerHTML = '<p class="dim">Loading…</p>';
     return;
   }
-  body.innerHTML = status.linked && !status.broken ? linkedView() : linkForm(status.broken);
-  document.getElementById('btnClans').classList.toggle('on', status.linked && !status.broken);
+  const linked = status.linked && !status.broken;
+  body.innerHTML = linked ? linkedView() : linkForm(status.broken);
+  document.getElementById('btnClans').classList.toggle('on', linked);
+  if (!linked) prepareLink();
 }
 
 async function refresh() {
@@ -108,24 +133,27 @@ function closeClans() {
 }
 
 body.addEventListener('click', async (e) => {
-  const target = e.target.closest('button');
+  const target = e.target.closest('button, a');
   if (!target) return;
   if (target.id === 'clanLink') {
-    const hub = document.getElementById('clanHub').value.trim();
-    const result = await api('/api/clan/link', { hub });
-    if (!result.ok) return;
-    rememberHub(hub);
-    openOnHub(result.url);
-    body.querySelector('.note').textContent = 'Finish signing in on the hub in your browser. This panel updates when you come back.';
+    if (!target.href) {
+      e.preventDefault();
+      document.getElementById('clanHub').focus();
+      return;
+    }
+    rememberHub(document.getElementById('clanHub').value.trim());
+    document.getElementById('clanLinkNote').textContent = 'Finish signing in on the hub in your browser. This panel updates when you come back.';
   } else if (target.id === 'clanUnlink') {
     const result = await api('/api/clan/unlink', {});
     if (result.ok) addToast('🛡 This Mac is no longer linked', 'info');
     refresh();
-  } else if (target.id === 'clanHome') {
-    openOnHub(`${status.hub}/`);
-  } else if (target.dataset.open) {
-    openOnHub(`${status.hub}/clans/${encodeURIComponent(target.dataset.open)}`);
   }
+});
+
+body.addEventListener('input', (e) => {
+  if (e.target.id !== 'clanHub') return;
+  clearTimeout(prepareTimer);
+  prepareTimer = setTimeout(prepareLink, PREPARE_DELAY_MS);
 });
 
 body.addEventListener('change', async (e) => {

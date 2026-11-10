@@ -59,11 +59,11 @@ export function closeBuildingMenu() {
 }
 
 export function openGroundMenu(sx, sy) {
+  if (CLAN_ID) return;
   const menu = document.getElementById('groundMenu');
   menu.classList.add('open');
   menu.style.left = `${Math.min(sx, innerWidth - 240)}px`;
   menu.style.top = `${Math.min(sy, innerHeight - 60)}px`;
-  if (CLAN_ID) return;
 }
 
 function showFoundFields() {

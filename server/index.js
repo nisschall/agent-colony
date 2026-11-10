@@ -135,12 +135,6 @@ const server = http.createServer((req, res) => {
     return;
   }
   const pathname = req.url.split('?')[0];
-  if (pathname === '/' || pathname === '/index.html') {
-    let template;
-    try {
-      template = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
-    } catch (error) {
-      console.error(`Could not read the page: ${error.message}`);
   // The hub sends the browser back here after you sign in, to finish linking this Mac.
   if (pathname === '/clan/linked') {
     const query = new URL(req.url, `http://${req.headers.host}`).searchParams;
@@ -155,6 +149,12 @@ const server = http.createServer((req, res) => {
       });
     return;
   }
+  if (pathname === '/' || pathname === '/index.html') {
+    let template;
+    try {
+      template = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+    } catch (error) {
+      console.error(`Could not read the page: ${error.message}`);
       res.writeHead(500);
       res.end();
       return;
@@ -181,5 +181,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`Scanned ${files.size} logs (${agents.size} agents) in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   setInterval(() => { poll(); broadcast(); }, 2000);
   setInterval(discover, 15000);
-});
   startPushing();
+});

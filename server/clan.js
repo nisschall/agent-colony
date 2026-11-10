@@ -12,7 +12,8 @@ const { snapshot } = require('./snapshot');
 
 const PUSH_MS = 5000;
 const STATUS_CACHE_MS = 30_000;
-const LINK_MS = 10 * 60 * 1000;
+const LINK_MS = 30 * 60 * 1000;
+const MAX_PENDING_LINKS = 10;
 const REQUEST_TIMEOUT_MS = 10_000;
 const REMOTE_CACHE_MS = 10 * 60 * 1000;
 const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -21,7 +22,8 @@ const EVENT_TEXT = { review: 'got new orders', alarm: 'was stopped', waiting: 'i
 const NOT_LINKED = 'This Mac is not linked to a hub yet.';
 
 let state = readState();
-let pendingLink = null;
+// Links started from the town (the wallpaper and a browser tab can each have one ready), by their state.
+const pendingLinks = new Map();
 let cachedStatus = null;
 let lastPush = { ok: false, at: 0, message: '' };
 const remotes = new Map();
@@ -146,18 +148,24 @@ async function hubRequest(method, pathname, body) {
 
 function startLink(rawHub) {
   const hub = hubOrigin(rawHub);
-  pendingLink = { hub, state: crypto.randomBytes(16).toString('base64url'), exp: Date.now() + LINK_MS };
-  const params = new URLSearchParams({ callback: `http://localhost:${PORT}/clan/linked`, state: pendingLink.state });
+  const now = Date.now();
+  for (const [key, link] of pendingLinks) {
+    if (link.exp < now) pendingLinks.delete(key);
+  }
+  while (pendingLinks.size >= MAX_PENDING_LINKS) pendingLinks.delete(pendingLinks.keys().next().value);
+  const linkState = crypto.randomBytes(16).toString('base64url');
+  pendingLinks.set(linkState, { hub, exp: now + LINK_MS });
+  const params = new URLSearchParams({ callback: `http://localhost:${PORT}/clan/linked`, state: linkState });
   return `${hub}/link?${params}`;
 }
 
 // The state check means only a link this town started can finish here.
 async function finishLink(query) {
-  const link = pendingLink;
-  if (!link || link.exp < Date.now() || query.get('state') !== link.state) {
+  const link = pendingLinks.get(query.get('state') || '');
+  if (!link || link.exp < Date.now()) {
     throw new ApiError(400, 'This link was not started from your town, or it expired. Start again from the town.');
   }
-  pendingLink = null;
+  pendingLinks.clear();
   const response = await fetch(`${link.hub}/api/link/exchange`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

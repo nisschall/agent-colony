@@ -285,6 +285,8 @@ body.wallpaper #statusBar { opacity: .9; }
 #clans .ok { color: var(--green); }
 #clans .warn { color: var(--red); }
 #btnClans.on { color: var(--gold); }
+#clans a.btn { display: inline-block; text-decoration: none; }
+#clans a.btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 #btnMembers, #clanSeg { display: none; }
 
 /* A clan's shared town on a hub: watch-only, so everything that spends, hires or talks to agents is hidden. */
