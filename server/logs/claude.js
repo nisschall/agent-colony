@@ -9,8 +9,9 @@ function handleClaudeTool(agent, ts, block) {
   const input = block.input || {};
   agent.lastAction = shortTarget(block.name, input);
   agent.waiting = false;
-  if (block.name.endsWith('wrap_up') && input.ask) {
-    agent.pendingAsk = input.ask;
+  if (block.name.endsWith('wrap_up')) {
+    agent.pendingAsk = input.ask || '';
+    agent.pendingRecap = input.recap || '';
   } else if (block.name === 'AskUserQuestion') {
     startWaiting(agent, ts, input.questions?.[0]?.question || 'a question for you');
   } else if (block.name === 'ExitPlanMode') {

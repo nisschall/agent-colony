@@ -334,3 +334,18 @@ test('the backup script copies the database while the hub runs', () => {
   assert.strictEqual(backups.length, 1);
   assert.match(backups[0], /^hub-\d{4}-\d{2}-\d{2}\.db$/);
 });
+
+test('shared summaries, questions and update posts reach the town, trimmed', () => {
+  const clean = cleanReport({
+    projects: [{ key: SHARED_REPO, name: 'shop', clans: ['mine'] }],
+    agents: [
+      { id: 'a', project: SHARED_REPO, status: 'waiting', ask: 'q'.repeat(500), summary: { text: 'Did the thing.', ts: 5 } },
+      { id: 'b', project: SHARED_REPO, status: 'working', ask: 'not waiting, so dropped' },
+    ],
+    events: ['update', 'broke', 'fixed'].map((kind) => ({ ts: 1, kind, project: SHARED_REPO, agent: 'a', text: `${kind} text` })),
+  }, new Set(['mine']));
+  assert.deepStrictEqual(clean.agents[0].summary, { text: 'Did the thing.', ts: 5 });
+  assert.strictEqual(clean.agents[0].ask.length, 200);
+  assert.strictEqual(clean.agents[1].ask, '');
+  assert.deepStrictEqual(clean.events.map((e) => e.kind), ['update', 'broke', 'fixed']);
+});

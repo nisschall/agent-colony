@@ -137,7 +137,8 @@ function updateHover(sx, sy) {
     const detail = a.owner ? `${escapeHtml(a.owner)}'s agent${a.lastAction ? ` · ${escapeHtml(a.lastAction)}` : ''}` : `${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
     html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status, a.owner)} · ${where}<br>${detail}`;
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
-    if (a.status === 'waiting' && !a.owner) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
+    if (a.status === 'waiting' && a.waitingAsk) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
+    if (a.summary) html += `<br><span style="color:var(--muted)">💬 ${escapeHtml(a.summary.text)}</span>`;
   } else {
     html = buildingTooltip(hit.building);
   }

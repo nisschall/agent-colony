@@ -75,6 +75,8 @@ A clan is a shared town: everyone's shared projects, their agents, who is waitin
 
 Unlinking (in the panel, or on the hub's page) stops sharing straight away.
 
+**📣 Updates** (top left, in your town and in clan towns): what agents finished, the questions they are waiting on, and builds that broke or recovered: one post per finished turn at most every 10 minutes per agent, never every edit. Click one to open that agent; answered questions turn grey. Clans see your agents' updates only if you turn on **Share my agents' updates** in the 🛡 panel; otherwise they see status and current tool only.
+
 ## Privacy
 
 Everything stays on your Mac unless you link it to a clan hub. The server only listens on `127.0.0.1` and reads your local session logs. Once linked, it sends the hub a short summary of the projects you chose to share, and nothing about the others. That summary has no transcripts, prompts, code, commands or folder paths: the full list is in [hub/README.md](hub/README.md#what-members-share). `town.json`, `portal-agents.json` and `clan.json` (your layout, hired agents and hub link) are written next to the code and are not committed.

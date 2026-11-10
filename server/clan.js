@@ -1,6 +1,7 @@
 // Sharing this colony with clans on a hub: linking this Mac to your GitHub account, choosing which projects
 // each clan sees, and sending the hub a short summary every few seconds.
-// Only that summary leaves the Mac: no transcripts, prompts, code, commands, questions or folder paths.
+// Only that summary leaves the Mac: no transcripts, prompts, code, commands or folder paths. Agents' own
+// end-of-turn summaries and the questions they ask you are added only if you turn on "share updates".
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -8,6 +9,7 @@ const os = require('os');
 const path = require('path');
 const { ApiError } = require('./api-error');
 const { CLAN_FILE, PORT } = require('./config');
+const { WAITING_PREFIX } = require('./agents');
 const { snapshot } = require('./snapshot');
 
 const PUSH_MS = 5000;
@@ -20,6 +22,7 @@ const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'
 const BUILD_TEXT = /^(Built|Rebuilt|Patched) /;
 const EVENT_TEXT = { review: 'got new orders', alarm: 'was stopped', waiting: 'is waiting for review', error: 'hit an error', hire: 'hired a helper' };
 const NOT_LINKED = 'This Mac is not linked to a hub yet.';
+const PORTAL_WAITING_PREFIX = 'needs you: ';
 
 let state = readState();
 // Links started from the town (the wallpaper and a browser tab can each have one ready), by their state.
@@ -100,14 +103,25 @@ function safeActivity(lastAction) {
   return tool;
 }
 
-function safeEventText(event) {
+function waitingQuestion(text) {
+  for (const prefix of [WAITING_PREFIX, PORTAL_WAITING_PREFIX]) {
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return '';
+}
+
+function safeEventText(event, shareUpdates) {
   if (event.kind === 'build') return BUILD_TEXT.test(event.text) ? event.text : 'finished a task';
   if (event.kind === 'hire' && event.text.startsWith('was hired')) return 'was hired';
+  if (event.kind === 'broke' || event.kind === 'fixed') return event.text;
+  if (event.kind === 'update') return shareUpdates ? event.text : '';
+  if (event.kind === 'waiting' && shareUpdates) return waitingQuestion(event.text) || EVENT_TEXT.waiting;
   return EVENT_TEXT[event.kind] || '';
 }
 
 // `shares` maps a project name to the clan ids that see it; `keyOf` turns a project folder into its hub key.
-function buildReport(snap, shares, keyOf) {
+// `shareUpdates` adds agents' end-of-turn summaries and the questions they ask.
+function buildReport(snap, shares, keyOf, shareUpdates = false) {
   const projects = [];
   const keys = new Map();
   for (const project of snap.projects) {
@@ -126,10 +140,12 @@ function buildReport(snap, shares, keyOf) {
       id: agent.id, kind: agent.kind, project: keys.get(agent.workProject), status: agent.status,
       title: agent.title, model: agent.model, activity: safeActivity(agent.lastAction),
       waitingSince: agent.status === 'waiting' ? agent.waitingSince : 0, lastTs: agent.lastTs,
+      summary: shareUpdates && agent.summary ? agent.summary : null,
+      ask: shareUpdates && agent.status === 'waiting' ? agent.waitingAsk : '',
     }));
   const events = snap.events
     .filter((event) => keys.has(event.project))
-    .map((event) => ({ ts: event.ts, kind: event.kind, project: keys.get(event.project), agent: event.agentId, text: safeEventText(event) }))
+    .map((event) => ({ ts: event.ts, kind: event.kind, project: keys.get(event.project), agent: event.agentId, text: safeEventText(event, shareUpdates) }))
     .filter((event) => event.text);
   return { version: 1, projects, agents, events };
 }
@@ -204,9 +220,17 @@ function setShares(project, clans) {
   return state.shares;
 }
 
+function setShareUpdates(on) {
+  if (!state) throw new ApiError(400, NOT_LINKED);
+  state.shareUpdates = Boolean(on);
+  saveState();
+  return state.shareUpdates;
+}
+
 async function clanStatus() {
-  if (!state) return { linked: false, broken: false, hub: '', user: null, clans: [], shares: {}, lastPush };
-  if (state.broken) return { linked: true, broken: true, hub: state.hub, user: state.user, clans: [], shares: state.shares, lastPush };
+  if (!state) return { linked: false, broken: false, hub: '', user: null, clans: [], shares: {}, shareUpdates: false, lastPush };
+  const shareUpdates = Boolean(state.shareUpdates);
+  if (state.broken) return { linked: true, broken: true, hub: state.hub, user: state.user, clans: [], shares: state.shares, shareUpdates, lastPush };
   if (!cachedStatus || Date.now() - cachedStatus.at > STATUS_CACHE_MS) {
     try {
       const me = await hubRequest('GET', '/api/me');
@@ -218,10 +242,10 @@ async function clanStatus() {
         return clanStatus();
       }
       // Still linked: show the last clans we knew, and why the hub can't be reached.
-      return { linked: true, broken: false, hub: state.hub, user: state.user, clans: cachedStatus?.clans || [], shares: state.shares, lastPush, hubError: error.message };
+      return { linked: true, broken: false, hub: state.hub, user: state.user, clans: cachedStatus?.clans || [], shares: state.shares, shareUpdates, lastPush, hubError: error.message };
     }
   }
-  return { linked: true, broken: false, hub: state.hub, user: cachedStatus.user, clans: cachedStatus.clans, shares: state.shares, lastPush, hubError: '' };
+  return { linked: true, broken: false, hub: state.hub, user: cachedStatus.user, clans: cachedStatus.clans, shares: state.shares, shareUpdates, lastPush, hubError: '' };
 }
 
 let pushing = false;
@@ -230,7 +254,7 @@ async function push() {
   if (!state || state.broken || pushing) return;
   pushing = true;
   try {
-    const report = buildReport(snapshot(true, Object.keys(state.shares)), state.shares, projectKey);
+    const report = buildReport(snapshot(true, Object.keys(state.shares)), state.shares, projectKey, Boolean(state.shareUpdates));
     await hubRequest('POST', '/api/report', report);
     lastPush = { ok: true, at: Date.now(), message: '' };
   } catch (error) {
@@ -250,4 +274,4 @@ function startPushing() {
   setInterval(push, PUSH_MS);
 }
 
-module.exports = { startLink, finishLink, unlink, setShares, clanStatus, startPushing, buildReport, normalizeRemote };
+module.exports = { startLink, finishLink, unlink, setShares, setShareUpdates, clanStatus, startPushing, buildReport, normalizeRemote };

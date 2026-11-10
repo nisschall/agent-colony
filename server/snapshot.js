@@ -7,6 +7,9 @@ const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects
 const { currentTownSeed } = require('./town');
 
 const BUILDING_PLOTS = 12;
+const RECENT_EVENTS = 80;
+const UPDATE_EVENTS = 50;
+const UPDATE_KINDS = new Set(['update', 'waiting', 'broke', 'fixed']);
 const IMPORTANCE_DAYS = 7;
 // One message from you counts like ten minutes of agent work: projects you are engaged with matter more.
 const MESSAGE_WEIGHT = 10;
@@ -121,7 +124,7 @@ function snapshot(ready, only = null) {
       linesAdded: agent.linesAdded, linesRemoved: agent.linesRemoved,
       filesTouched: agent.files.size, lastFile: agent.lastFile, lastAction: agent.lastAction,
       lastHumanTs: agent.lastHumanTs, humanMsgs: agent.humanMsgs, interrupts: agent.interrupts,
-      waiting: status === 'waiting', waitingSince, waitingAsk,
+      waiting: status === 'waiting', waitingSince, waitingAsk, summary: agent.summary,
       portal,
       status, ...stress,
     });
@@ -134,7 +137,11 @@ function snapshot(ready, only = null) {
     project.profile = profileOf(project.path);
     project.problems = problemsOf(project.name, now);
   }
-  const sortedEvents = events.slice().sort((a, b) => a.ts - b.ts).slice(-80);
+  // The latest events of every kind, plus the day's updates even when many edits came after them.
+  const allEvents = events.slice().sort((a, b) => a.ts - b.ts);
+  const recent = allEvents.slice(-RECENT_EVENTS);
+  const updates = allEvents.filter((e) => UPDATE_KINDS.has(e.kind)).slice(-UPDATE_EVENTS);
+  const sortedEvents = [...new Set([...updates, ...recent])].sort((a, b) => a.ts - b.ts);
   return {
     now, ready, agents: roster, projects: shown, events: sortedEvents,
     defaults: { projectsFolder: DEFAULT_PROJECTS_FOLDER },

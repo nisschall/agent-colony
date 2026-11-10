@@ -29,6 +29,7 @@ function getAgent(id, kind) {
     recent: [], daily: new Map(),
     lastHumanTs: 0, humanMsgs: 0, interrupts: 0,
     waiting: false, waitingSince: 0, waitingAsk: '', pendingAsk: '', lastText: '',
+    summary: null, pendingRecap: '',
   };
   agents.set(id, agent);
   return agent;
@@ -134,6 +135,7 @@ function markHuman(agent, ts) {
   dayStats(agent, ts).humanMsgs += 1;
   agent.waiting = false;
   agent.pendingAsk = '';
+  agent.pendingRecap = '';
   addEvent(agent, ts, 'review', 'got new orders from you');
 }
 
@@ -147,7 +149,38 @@ function startWaiting(agent, ts, ask) {
   agent.waiting = true;
   agent.waitingSince = ts;
   agent.waitingAsk = String(ask).replace(/\s+/g, ' ').slice(0, 160);
-  addEvent(agent, ts, 'waiting', `is waiting for your review: ${agent.waitingAsk.slice(0, 60)}`);
+  addEvent(agent, ts, 'waiting', `${WAITING_PREFIX}${agent.waitingAsk}`);
+}
+
+const WAITING_PREFIX = 'is waiting for your review: ';
+const SUMMARY_MAX = 160;
+const UPDATE_WINDOW_MS = 10 * MIN;
+
+// A one-line summary from a closing message: its first sentence, without headings or markdown.
+function firstSentence(text) {
+  const plain = String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join(' ')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const sentence = (plain.match(/^.+?[.!?](?=\s|$)/) || [plain])[0];
+  return sentence.length > SUMMARY_MAX ? `${sentence.slice(0, SUMMARY_MAX - 1).trimEnd()}…` : sentence;
+}
+
+// At most one update post per agent every 10 minutes: a newer summary replaces the agent's recent post,
+// and a summary identical to its last one is not posted again.
+function postUpdate(agent, ts, text) {
+  const previous = events.findLast((e) => e.agentId === agent.id && e.kind === 'update');
+  if (previous && previous.text === text) return;
+  if (previous && ts - previous.ts < UPDATE_WINDOW_MS) {
+    previous.text = text;
+    previous.ts = ts;
+    return;
+  }
+  addEvent(agent, ts, 'update', text);
 }
 
 const LIST_LINE = /^\s*(?:[-*•]|\d+[.)])\s+|^\s{2,}\S/;
@@ -163,11 +196,20 @@ function closingQuestion(text) {
 }
 
 // A turn that ends on a pending question (desktop wrap-up "ask", or a closing question) is blocked on you.
+// Every finished turn leaves a summary: the desktop app's recap, or the closing message's first sentence.
+// A turn that asks you something posts the question instead of an update.
 function endTurn(agent, ts) {
   const ask = agent.pendingAsk || closingQuestion(agent.lastText);
+  const summary = agent.pendingRecap ? firstSentence(agent.pendingRecap) : firstSentence(agent.lastText);
   agent.pendingAsk = '';
-  if (ask) startWaiting(agent, ts, ask);
-  else agent.waiting = false;
+  agent.pendingRecap = '';
+  if (summary) agent.summary = { ts, text: summary };
+  if (ask) {
+    startWaiting(agent, ts, ask);
+    return;
+  }
+  agent.waiting = false;
+  if (summary) postUpdate(agent, ts, summary);
 }
 
 function humanText(content) {
@@ -211,4 +253,4 @@ function statusOf(agent, now, stress) {
   return 'working';
 }
 
-module.exports = { creditedProject, agents, projectPaths, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };
+module.exports = { WAITING_PREFIX, creditedProject, agents, projectPaths, events, dailyCost, dailyLines, dayKey, getAgent, touch, pushRecent, addEvent, addCost, addLines, markHuman, markInterrupted, startWaiting, endTurn, humanText, countLines, shortTarget, stressOf, statusOf };

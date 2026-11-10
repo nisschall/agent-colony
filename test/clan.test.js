@@ -43,3 +43,23 @@ test('the report holds only shared projects and leaves out commands, questions, 
     assert.ok(!sent.includes(secret), `report must not contain ${secret}`);
   }
 });
+
+test('agents\' summaries and questions are shared only when the member turns on sharing updates', () => {
+  const now = Date.now();
+  const snap = {
+    projects: [{ name: 'shop', path: '/Users/me/code/shop', lastTs: now, profile: null, problems: { failing: [], errorsLastHour: 0 } }],
+    agents: [{ id: 'claude:1', kind: 'claude', workProject: 'shop', status: 'waiting', waitingSince: now, waitingAsk: 'Which repository?', lastAction: 'Bash: ls', lastTs: now, summary: { ts: now, text: 'Drafted both options.' } }],
+    events: [
+      { ts: now, kind: 'update', project: 'shop', agentId: 'claude:1', text: 'Drafted both options.' },
+      { ts: now, kind: 'waiting', project: 'shop', agentId: 'claude:1', text: 'is waiting for your review: Which repository?' },
+      { ts: now, kind: 'broke', project: 'shop', agentId: 'claude:1', text: 'Build failing in shop' },
+    ],
+  };
+  const key = () => 'git:aaaaaaaaaaaaaaaaaaaa';
+  const off = buildReport(snap, { shop: ['c1'] }, key);
+  assert.deepStrictEqual([off.agents[0].summary, off.agents[0].ask], [null, '']);
+  assert.deepStrictEqual(off.events.map((e) => e.text), ['is waiting for review', 'Build failing in shop']);
+  const on = buildReport(snap, { shop: ['c1'] }, key, true);
+  assert.deepStrictEqual([on.agents[0].summary.text, on.agents[0].ask], ['Drafted both options.', 'Which repository?']);
+  assert.deepStrictEqual(on.events.map((e) => e.text), ['Drafted both options.', 'Which repository?', 'Build failing in shop']);
+});

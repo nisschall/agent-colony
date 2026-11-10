@@ -20,7 +20,7 @@ function townAgent(agent, projectName) {
   return {
     id: agent.id, kind: agent.kind, parentId: null, owner: agent.owner,
     project: projectName, workProject: projectName, title: agent.title, model: agent.model,
-    status: agent.status, waiting: agent.status === 'waiting', waitingSince: agent.waitingSince, waitingAsk: `waiting on ${agent.owner}`,
+    status: agent.status, waiting: agent.status === 'waiting', waitingSince: agent.waitingSince, waitingAsk: agent.ask, summary: agent.summary,
     lastAction: agent.activity, lastTs: agent.lastTs, firstTs: agent.lastTs,
     tokens: NO_TOKENS, context: 0, cost: 0, toolCalls: 0, toolErrors: 0, edits: 0, linesAdded: 0, linesRemoved: 0,
     filesTouched: 0, lastFile: '', lastHumanTs: 0, humanMsgs: 0, interrupts: 0, portal: null, today: null,

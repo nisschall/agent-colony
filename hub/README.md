@@ -24,9 +24,11 @@ Each linked Mac sends the hub a short summary every 5 seconds, for the projects 
 
 - each shared project: its name, a hash of its git remote (so the same repo becomes one building), its size and complexity, failing builds or tests, and how many tool errors it had in the last hour;
 - each agent in those projects: its status, session title, model, and current tool, with a file name but no folder (for example `Edit: Cart.java`, or just `Bash`);
-- recent activity in those projects, for example `Rebuilt Cart.java (+3 −1)` or `hit an error`.
+- recent activity in those projects, for example `Rebuilt Cart.java (+3 −1)`, `hit an error` or `Build failing in shop`.
 
-Never sent: transcripts, prompts, code, shell commands, what an agent is asking you, error text, folder paths or costs.
+**Only if the member turns on "Share my agents' updates"** in their 🛡 panel (off by default): each agent's end-of-turn summary (the desktop app's recap, or the first sentence of its closing message) and the question it is waiting on. These fill the clan's **📣 Updates** drawer and the "now" line on agent cards and the 👥 board. Updates are posted once per finished turn, at most once per agent every 10 minutes (a newer one replaces the last), plus a post when an agent starts waiting or a build or test run breaks or recovers.
+
+Never sent: transcripts, prompts, code, shell commands, error text, folder paths or costs.
 
 ## What the hub stores
 

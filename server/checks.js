@@ -1,6 +1,6 @@
 // What's wrong in each project: the last build and test run (a broken build stays visible until one passes),
 // and how many tool errors agents hit there in the last hour.
-const { creditedProject } = require('./agents');
+const { addEvent, creditedProject } = require('./agents');
 const { MIN } = require('./config');
 
 const TEST_COMMAND = /\b(mvnw?|gradlew?)\b[^|;&]*\b(test|verify)\b|\b(npm|yarn|pnpm)( run)? test\b|\bpytest\b|\bgo test\b|\bcargo test\b|\bnpx (jest|vitest|playwright)\b|\bng test\b/;
@@ -63,8 +63,13 @@ function noteResult(agent, block, ts) {
   if (NOT_RUN.test(text)) return;
   const ok = !block.is_error && !FAILURE_OUTPUT.test(text);
   const checks = projectChecks.get(pending.project) || {};
+  const before = checks[pending.kind];
   checks[pending.kind] = { ok, command: pending.command, ts, agentId: agent.id };
   projectChecks.set(pending.project, checks);
+  // Only a change is news: the first failure after passing (or none yet), and the first pass after failing.
+  const label = pending.kind === 'tests' ? 'Tests' : 'Build';
+  if (!ok && (!before || before.ok)) addEvent(agent, ts, 'broke', `${label} failing in ${pending.project}`);
+  if (ok && before && !before.ok) addEvent(agent, ts, 'fixed', `${label} passing again in ${pending.project}`);
 }
 
 // A failure older than a day is history, not a live problem.

@@ -64,7 +64,10 @@ function stateLine(agent) {
   const outcome = portal && portal.outcome;
   if (outcome && outcome.state === 'needs-you') return { kind: 'needs', text: `🙋 Needs you · ${outcome.summary}` };
   if (outcome) return { kind: 'done', text: `✓ Done ${duration(now - outcome.ts)} ago · ready for the next task` };
-  if (agent.status === 'waiting' && agent.owner) return { kind: 'needs', text: `🙋 Waiting on ${agent.owner} for ${duration(now - agent.waitingSince)}` };
+  if (agent.status === 'waiting' && agent.owner) {
+    const question = agent.waitingAsk ? ` · ${agent.waitingAsk}` : '';
+    return { kind: 'needs', text: `🙋 Waiting on ${agent.owner} for ${duration(now - agent.waitingSince)}${question}` };
+  }
   if (agent.status === 'waiting') {
     return { kind: 'needs', text: `🙋 Waiting on you for ${duration(now - agent.waitingSince)} · ${agent.waitingAsk}` };
   }
@@ -78,6 +81,10 @@ function renderStateLine(agent) {
   const element = document.getElementById('sheetState');
   element.className = `state-line ${line.kind}`;
   element.textContent = line.text;
+  // What the agent said it did at the end of its last turn.
+  const summary = document.getElementById('sheetNow');
+  summary.style.display = agent.summary ? '' : 'none';
+  summary.textContent = agent.summary ? `💬 ${agent.summary.text} · ${duration(Date.now() - agent.summary.ts)} ago` : '';
 }
 
 function renderTask(agent) {

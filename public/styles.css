@@ -303,3 +303,37 @@ body.clan #treasurySeg, body.clan #statusDetails, body.clan #btnRebuild, body.cl
 body.clan #sheetExpand, body.clan #sheetStats, body.clan #sheetMoreToggle, body.clan #sheetMore, body.clan #ctxHire,
 body.clan #ctxShell, body.clan #ctxRun, body.clan #ctxRecent, body.clan #btnShell { display: none !important; }
 body.clan #statusBar { cursor: default; }
+
+/* Updates drawer on the left: a short glance when closed, the last day's updates when open. */
+#feed { left: calc(var(--inset-left) + 12px); top: calc(var(--inset-top) + 56px); width: min(340px, calc(100vw - 24px)); padding: 6px 10px; z-index: 3; }
+#feed.open { bottom: calc(var(--inset-bottom) + 236px); display: flex; flex-direction: column; }
+.feed-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; padding: 2px 0; color: var(--cream); cursor: pointer; font: inherit; text-align: left; }
+.feed-head .count { color: var(--gold); font-size: 17px; }
+.feed-head .chev { margin-left: auto; color: var(--muted); transition: transform .15s; }
+#feed.open .feed-head .chev { transform: rotate(90deg); }
+.feed-filters { display: none; gap: 6px; margin: 6px 0 2px; }
+#feed.open .feed-filters { display: flex; }
+.feed-filters .chip.on { border-color: var(--gold); color: var(--gold); }
+#feedList { list-style: none; margin: 4px 0 0; padding: 0; overflow-y: auto; min-height: 0; flex: 1; }
+#feedList li { padding: 5px 0; border-top: 1px solid rgba(255,255,255,.08); line-height: 1.05; cursor: pointer; }
+#feedList li:first-child { border-top: 0; }
+#feedList li:hover .what { color: var(--gold); }
+#feedList .meta { display: flex; gap: 6px; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+#feedList .who { color: var(--cream); }
+#feedList .where { overflow: hidden; text-overflow: ellipsis; }
+#feedList .t { margin-left: auto; flex: none; }
+#feedList .what { overflow-wrap: anywhere; }
+#feed:not(.open) #feedList .what { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#feedList .waiting .what { color: var(--gold); }
+#feedList .waiting.answered .what { color: var(--muted); }
+#feedList .broke .what { color: var(--red); }
+#feedList .fixed .what { color: var(--green); }
+#feedList .empty { color: var(--muted); cursor: default; }
+#chronicle .broke { color: var(--red); }
+#chronicle .fixed { color: var(--green); }
+.now { margin-top: 6px; color: var(--cream); line-height: 1.05; overflow-wrap: anywhere; }
+#clans .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+body.wallpaper #feed { display: none; }
+@media (max-width: 760px) {
+  #feed.open { bottom: auto; max-height: 45vh; }
+}

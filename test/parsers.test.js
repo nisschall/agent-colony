@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { getAgent, statusOf, stressOf } = require('../server/agents');
+const { events, getAgent, statusOf, stressOf } = require('../server/agents');
 const { problemsOf } = require('../server/checks');
 const { conversationOf } = require('../server/conversation');
 const { handleClaudeLine } = require('../server/logs/claude');
@@ -192,4 +192,47 @@ test('codex: project, model, cost, patches and failed commands', () => {
   assert.strictEqual(agent.linesRemoved, 1);
   assert.strictEqual(agent.toolErrors, 1);
   assert.ok(agent.cost > 0);
+});
+
+function eventsOf(agent, kind) {
+  return events.filter((e) => e.agentId === agent.id && e.kind === kind);
+}
+
+test('a finished turn leaves a summary: the desktop recap, else the first sentence of the closing message', () => {
+  const { agent } = newAgent();
+  assistant(agent, [{ type: 'tool_use', id: 'wu1', name: 'mcp__ccd_turn__wrap_up', input: { recap: 'Fixed the login bug; tests pass. Not committed.' } }]);
+  assistant(agent, [{ type: 'text', text: 'All done.' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(agent.summary.text, 'Fixed the login bug; tests pass.');
+  const other = newAgent().agent;
+  assistant(other, [{ type: 'text', text: '## Result\n\n**Added** the `export` button to reports. It works on both pages.' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(other.summary.text, 'Added the export button to reports.');
+});
+
+test('updates are posted at most once per agent every 10 minutes, and never twice the same', () => {
+  const { agent } = newAgent();
+  assistant(agent, [{ type: 'text', text: 'Wrote the parser.' }], { stop_reason: 'end_turn' });
+  assistant(agent, [{ type: 'text', text: 'Wrote the parser.' }], { stop_reason: 'end_turn' });
+  assistant(agent, [{ type: 'text', text: 'Added tests for the parser.' }], { stop_reason: 'end_turn' });
+  assert.deepStrictEqual(eventsOf(agent, 'update').map((e) => e.text), ['Added tests for the parser.']);
+  clock += 11 * 60_000;
+  assistant(agent, [{ type: 'text', text: 'Hooked the parser into the server.' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(eventsOf(agent, 'update').length, 2);
+});
+
+test('a turn that asks you something posts the question, not an update', () => {
+  const { agent } = newAgent();
+  assistant(agent, [{ type: 'text', text: 'Drafted both options. Which one should I build?' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(eventsOf(agent, 'update').length, 0);
+  assert.deepStrictEqual(eventsOf(agent, 'waiting').map((e) => e.text), ['is waiting for your review: Which one should I build?']);
+  assert.strictEqual(agent.summary.text, 'Drafted both options.');
+});
+
+test('a build breaking and recovering is posted once each, not on every failing run', () => {
+  const { agent } = newAgent();
+  for (const [id, output] of [['c1', '[ERROR] COMPILATION ERROR'], ['c2', '[ERROR] COMPILATION ERROR'], ['c3', 'ok']]) {
+    bash(agent, id, './mvnw compile -q | tail');
+    toolResult(agent, id, output);
+  }
+  assert.deepStrictEqual(eventsOf(agent, 'broke').map((e) => e.text), [`Build failing in ${agent.project}`]);
+  assert.deepStrictEqual(eventsOf(agent, 'fixed').map((e) => e.text), [`Build passing again in ${agent.project}`]);
 });

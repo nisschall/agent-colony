@@ -7,6 +7,8 @@ import { api } from './forms.js';
 import { duration, escapeHtml } from '../utils.js';
 
 const HUB_KEY = 'agentColony.hub';
+const UPDATES_NOTE = 'Adds what your agents say at the end of each turn, and the questions they ask you, for shared projects only. '
+  + 'Off: clans see only status and current tool.';
 const PRIVACY_NOTE = 'A clan sees each shared project\'s name, size and failing builds, and its agents\' status and current tool. '
   + 'Never your code, prompts, commands, questions or folder paths.';
 
@@ -101,7 +103,9 @@ function linkedView() {
     <div class="note">${pushLine()}</div>
     <div class="section"><div class="label">YOUR CLANS</div>${clanRows()}
       <div class="row-buttons">${hubLink(`${status.hub}/`, 'CREATE OR JOIN A CLAN ↗')}</div></div>
-    ${shareTable()}`;
+    ${shareTable()}
+    <div class="section"><label class="switch"><input type="checkbox" id="clanShareUpdates"${status.shareUpdates ? ' checked' : ''}> Share my agents' updates</label>
+      <div class="note">${UPDATES_NOTE}</div></div>`;
 }
 
 function render() {
@@ -157,6 +161,16 @@ body.addEventListener('input', (e) => {
 });
 
 body.addEventListener('change', async (e) => {
+  if (e.target.id === 'clanShareUpdates') {
+    const result = await api('/api/clan/updates', { share: e.target.checked });
+    if (result.ok) {
+      status.shareUpdates = result.shareUpdates;
+      addToast(`🛡 ${result.message}`, 'info');
+    } else {
+      e.target.checked = !e.target.checked;
+    }
+    return;
+  }
   const box = e.target.closest('input[data-project]');
   if (!box) return;
   const project = box.dataset.project;

@@ -6,7 +6,7 @@ const http = require('http');
 const { agents } = require('./agents');
 const { ApiError } = require('./api-error');
 const { API_TOKEN, PORT, PUBLIC_DIR } = require('./config');
-const { clanStatus, finishLink, setShares, startLink, startPushing, unlink } = require('./clan');
+const { clanStatus, finishLink, setShareUpdates, setShares, startLink, startPushing, unlink } = require('./clan');
 const { conversationOf } = require('./conversation');
 const { foundProject, hireAgent, openInTerminal, openProjectTerminal, releaseAgent, retryBlocked, sendOrders, stopAgent } = require('./portal');
 const { discover, files, poll } = require('./scanner');
@@ -62,6 +62,10 @@ async function handleApi(req, res) {
   if (req.url === '/api/clan/unlink') {
     await unlink();
     return sendJson(res, 200, { ok: true, message: 'This Mac is no longer linked to the hub.', agentId: null });
+  }
+  if (req.url === '/api/clan/updates') {
+    const shareUpdates = setShareUpdates(body.share);
+    return sendJson(res, 200, { ok: true, message: shareUpdates ? 'Your agents\' updates are shared with your clans.' : 'Updates are no longer shared.', agentId: null, shareUpdates });
   }
   if (req.url === '/api/clan/shares') {
     const shares = setShares(body.project, body.clans);

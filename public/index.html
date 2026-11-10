@@ -40,6 +40,16 @@
   <ul id="chronicleList"></ul>
 </div>
 
+<div id="feed" class="panel">
+  <button class="feed-head" id="feedToggle" title="Show or hide agents' updates"><span class="label">📣 UPDATES</span><span class="count" id="feedCount"></span><span class="chev">▸</span></button>
+  <div class="feed-filters" id="feedFilters">
+    <button class="chip on" data-filter="all">All</button>
+    <button class="chip" data-filter="waiting">Waiting</button>
+    <button class="chip" data-filter="mine">Mine</button>
+  </div>
+  <ul id="feedList"></ul>
+</div>
+
 <div id="toolbar" class="panel">
   <button class="btn" id="btnCrew" title="Today's crew">🎖</button>
   <button class="btn" id="btnFame" title="Hall of fame">🏆</button>
@@ -68,6 +78,7 @@
       </div>
     </div>
     <div class="state-line" id="sheetState"></div>
+    <div class="now" id="sheetNow"></div>
     <div class="label section">TASK</div>
     <div class="task" id="sheetTask" title="Click to show all"></div>
     <div class="stats" id="sheetStats"></div>

@@ -62,8 +62,33 @@ function renderMembers(board) {
       + `<td class="num">${m.agents}</td><td class="num">${waiting}</td></tr>`;
   });
   board.querySelector('#boardBody').innerHTML = rows.length
-    ? `<table><tr><th>MEMBER</th><th>ROLE</th><th>STATUS</th><th class="num">AGENTS</th><th class="num">WAITING ON THEM</th></tr>${rows.join('')}</table>`
+    ? `<table><tr><th>MEMBER</th><th>ROLE</th><th>STATUS</th><th class="num">AGENTS</th><th class="num">WAITING ON THEM</th></tr>${rows.join('')}</table>${agentsNow()}`
     : '<p>No members yet.</p>';
+}
+
+const AGENTS_PER_MEMBER = 5;
+const STATUS_ORDER = { waiting: 0, stuck: 1, overworked: 2, working: 3, idle: 4, sleeping: 5 };
+
+// One line per agent: what it said it did last (if its owner shares updates), else what it is doing now.
+function agentsNow() {
+  const byOwner = new Map();
+  for (const agent of state.data.agents) {
+    const list = byOwner.get(agent.owner) || [];
+    list.push(agent);
+    byOwner.set(agent.owner, list);
+  }
+  const rows = [...byOwner.entries()].sort((a, b) => a[0].localeCompare(b[0])).flatMap(([owner, agents]) => agents
+    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || b.lastTs - a.lastTs)
+    .slice(0, AGENTS_PER_MEMBER)
+    .map((agent) => {
+      const now = agent.summary
+        ? `${escapeHtml(agent.summary.text)} <span style="color:var(--muted)">· ${duration(Date.now() - agent.summary.ts)} ago</span>`
+        : `<span style="color:var(--muted)">${escapeHtml(agent.lastAction || 'no updates shared')}</span>`;
+      return `<tr class="row" data-id="${escapeHtml(agent.id)}"><td>${escapeHtml(owner)}</td><td>${escapeHtml(identity(agent).name)}</td>`
+        + `<td>${escapeHtml(agent.project)}</td><td>${statusLabel(agent.status, agent.owner)}</td><td>${now}</td></tr>`;
+    }));
+  if (!rows.length) return '';
+  return `<h2 style="margin-top:14px">WHAT THEIR AGENTS ARE DOING</h2><table><tr><th>MEMBER</th><th>AGENT</th><th>PROJECT</th><th>STATE</th><th>NOW</th></tr>${rows.join('')}</table>`;
 }
 
 function toggleBoard(mode) {

@@ -4,6 +4,7 @@ import { lighting } from './lighting.js';
 import { currentReviewee, reviewQueue } from './simulation.js';
 import { state } from './state.js';
 import { renderBoard, renderCrew } from './ui/boards.js';
+import { renderFeed } from './ui/feed.js';
 import { selectWorker } from './ui/sheet.js';
 import { clockTime, compact, escapeHtml, money, saveBudget } from './utils.js';
 
@@ -112,6 +113,7 @@ export function renderHud() {
   document.getElementById('popWaitWrap').classList.toggle('alert', counts.waiting > 0);
   const reviewee = currentReviewee();
   document.getElementById('popReview').textContent = reviewee ? `${reviewee.look.name}@${reviewee.agent.project}` : '—';
+  renderFeed();
   if (document.getElementById('board').classList.contains('open')) renderBoard(state.boardMode);
   if (document.getElementById('crew').classList.contains('open')) renderCrew();
 }

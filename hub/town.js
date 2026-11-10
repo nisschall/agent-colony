@@ -11,7 +11,7 @@ const TOWN_EVENTS = 100;
 const PROJECT_KEY = /^(git|local):[0-9a-f]{20}$/;
 const STATUSES = new Set(['working', 'overworked', 'stuck', 'waiting', 'idle', 'sleeping']);
 const AGENT_KINDS = new Set(['claude', 'codex', 'subagent']);
-const EVENT_KINDS = new Set(['build', 'review', 'alarm', 'waiting', 'error', 'hire']);
+const EVENT_KINDS = new Set(['build', 'review', 'alarm', 'waiting', 'error', 'hire', 'update', 'broke', 'fixed']);
 const CHECK_KINDS = new Set(['build', 'tests']);
 const TIERS = new Set(['cottage', 'house', 'office', 'tower', 'campus']);
 const RESTING = new Set(['idle', 'sleeping']);
@@ -70,12 +70,15 @@ function cleanAgent(raw, projectKeys) {
     activity: text(raw.activity, 80),
     waitingSince: number(raw.waitingSince),
     lastTs: number(raw.lastTs),
+    // Only sent when the member chose to share their agents' updates.
+    summary: raw.summary && raw.summary.text ? { text: text(raw.summary.text, 200), ts: number(raw.summary.ts) } : null,
+    ask: raw.status === 'waiting' ? text(raw.ask, 200) : '',
   };
 }
 
 function cleanEvent(raw, projectKeys) {
   if (!raw || !projectKeys.has(raw.project) || !EVENT_KINDS.has(raw.kind)) return null;
-  return { ts: number(raw.ts), kind: raw.kind, project: raw.project, agent: text(raw.agent, 80), text: text(raw.text, 100) };
+  return { ts: number(raw.ts), kind: raw.kind, project: raw.project, agent: text(raw.agent, 80), text: text(raw.text, 200) };
 }
 
 // Only clans the sender belongs to survive, so a report can't place projects in someone else's clan.
