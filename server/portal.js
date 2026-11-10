@@ -248,16 +248,10 @@ function shellQuote(text) {
   return `'${String(text).replace(/'/g, `'\\''`)}'`;
 }
 
-// Opens a hired agent's own Claude session in Terminal, so you can talk to it directly instead of through the town.
-function openInTerminal(agentId) {
-  const record = hiredRecord(agentId);
-  if (!record) throw new ApiError(403, 'Only agents hired from the town can be opened in Terminal.');
-  if (runningProcesses.has(agentId)) throw new ApiError(409, 'This agent is still working. Open it once it finishes, or stop it first.');
-  if (!SESSION_ID.test(record.sessionId)) throw new ApiError(400, 'This agent has no valid session to open.');
-  if (!fs.existsSync(record.cwd)) throw new ApiError(410, "This agent's folder no longer exists.");
-  const folder = shellQuote(record.cwd);
-  const claude = shellQuote(CLAUDE_BIN);
-  const command = `cd ${folder} && ${claude} --resume ${record.sessionId}`;
+const MAX_COMMAND = 500;
+
+// Runs a shell command in a new Terminal window, where you can watch it and stop it with Ctrl+C.
+function runInTerminal(command, label) {
   const scriptArgs = TERMINAL_SCRIPT.flatMap((line) => ['-e', line]);
   return new Promise((resolve, reject) => {
     const child = spawn('osascript', [...scriptArgs, command], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -266,14 +260,35 @@ function openInTerminal(agentId) {
     child.on('error', (err) => reject(new ApiError(500, `Could not open Terminal: ${err.message}`)));
     child.on('close', (code) => {
       if (code === 0) {
-        console.log(`[portal] ${agentId} opened in Terminal`);
+        console.log(`[portal] opened Terminal for ${label}`);
         resolve();
         return;
       }
-      console.warn(`[portal] Terminal open failed for ${agentId}: ${stderr.trim()}`);
+      console.warn(`[portal] Terminal open failed for ${label}: ${stderr.trim()}`);
       reject(new ApiError(500, 'macOS blocked opening Terminal. Allow it in System Settings → Privacy & Security → Automation.'));
     });
   });
 }
 
-module.exports = { portalAgents, runningProcesses, portalStatus, isReleased, hireAgent, foundProject, sendOrders, retryBlocked, stopAgent, releaseAgent, openInTerminal };
+// Opens a hired agent's own Claude session in Terminal, so you can talk to it directly instead of through the town.
+function openInTerminal(agentId) {
+  const record = hiredRecord(agentId);
+  if (!record) throw new ApiError(403, 'Only agents hired from the town can be opened in Terminal.');
+  if (runningProcesses.has(agentId)) throw new ApiError(409, 'This agent is still working. Open it once it finishes, or stop it first.');
+  if (!SESSION_ID.test(record.sessionId)) throw new ApiError(400, 'This agent has no valid session to open.');
+  if (!fs.existsSync(record.cwd)) throw new ApiError(410, "This agent's folder no longer exists.");
+  return runInTerminal(`cd ${shellQuote(record.cwd)} && ${shellQuote(CLAUDE_BIN)} --resume ${record.sessionId}`, agentId);
+}
+
+// A shell in a project's folder, optionally running one command you typed. It runs in Terminal, never
+// hidden inside the server, so every command is visible and can be stopped.
+function openProjectTerminal(folder, rawCommand) {
+  if (!folder || !fs.existsSync(folder)) throw new ApiError(410, "This project's folder can't be found.");
+  const command = String(rawCommand || '').trim();
+  if (command.length > MAX_COMMAND) throw new ApiError(400, `Keep the command under ${MAX_COMMAND} characters.`);
+  if (/[\r\n]/.test(command)) throw new ApiError(400, 'Run one command at a time (join steps with &&).');
+  const cd = `cd ${shellQuote(folder)}`;
+  return runInTerminal(command ? `${cd} && ${command}` : cd, folder);
+}
+
+module.exports = { portalAgents, runningProcesses, portalStatus, isReleased, hireAgent, foundProject, sendOrders, retryBlocked, stopAgent, releaseAgent, openInTerminal, openProjectTerminal };

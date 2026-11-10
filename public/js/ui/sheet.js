@@ -5,7 +5,7 @@ import { efficiency, levelOf, levelProgress, prettyModel, xpOf } from '../identi
 import { HIRED_MARK, drawPerson } from '../people.js';
 import { sendAway } from '../simulation.js';
 import { state } from '../state.js';
-import { api } from '../ui/forms.js';
+import { api, openTerminalIn } from '../ui/forms.js';
 import { clockTime, compact, duration, escapeHtml, money } from '../utils.js';
 
 const DETAILS_REFRESH_MS = 3000;
@@ -364,6 +364,10 @@ export function closeSheet() {
 }
 
 document.getElementById('sheetClose').onclick = closeSheet;
+document.getElementById('btnShell').onclick = () => {
+  const worker = state.workers.get(state.selectedId);
+  if (worker) openTerminalIn(worker.agent.project);
+};
 document.getElementById('btnFollow').onclick = () => {
   state.following = !state.following;
   renderSheet();

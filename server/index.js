@@ -8,7 +8,7 @@ const { ApiError } = require('./api-error');
 const { API_TOKEN, PORT, PUBLIC_DIR } = require('./config');
 const { clanStatus, finishLink, setShares, startLink, startPushing, unlink } = require('./clan');
 const { conversationOf } = require('./conversation');
-const { foundProject, hireAgent, openInTerminal, releaseAgent, retryBlocked, sendOrders, stopAgent } = require('./portal');
+const { foundProject, hireAgent, openInTerminal, openProjectTerminal, releaseAgent, retryBlocked, sendOrders, stopAgent } = require('./portal');
 const { discover, files, poll } = require('./scanner');
 const { snapshot } = require('./snapshot');
 const { currentTownSeed, rebuildTown } = require('./town');
@@ -66,6 +66,12 @@ async function handleApi(req, res) {
   if (req.url === '/api/clan/shares') {
     const shares = setShares(body.project, body.clans);
     return sendJson(res, 200, { ok: true, message: 'Sharing updated.', agentId: null, shares });
+  }
+  if (req.url === '/api/terminal') {
+    const [project] = snapshot(true, [String(body.project || '')]).projects;
+    if (!project) throw new ApiError(404, 'Unknown project.');
+    await openProjectTerminal(project.path, body.command);
+    return sendJson(res, 200, { ok: true, message: body.command ? 'Running in Terminal.' : 'Opened Terminal.', agentId: null });
   }
   if (req.url === '/api/town/rebuild') {
     rebuildTown(body.seed);

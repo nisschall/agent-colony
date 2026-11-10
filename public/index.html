@@ -111,6 +111,7 @@
       <button class="btn" id="btnOrders">SEND</button>
       <button class="btn" id="btnFollow">FOLLOW</button>
       <button class="btn" id="btnTerminal" title="Continue this agent's conversation in Terminal">💻 TERMINAL</button>
+      <button class="btn" id="btnShell" title="A new Terminal window in this agent's project folder">⌨ SHELL</button>
       <button class="btn danger" id="btnStop">STOP</button>
       <button class="btn" id="btnRelease" title="Send it out of town. Its conversation stays in Claude's history.">👋 RELEASE</button>
     </div>
@@ -122,6 +123,12 @@
   <div id="ctxProblems"></div>
   <button class="btn" id="ctxHire">🧑‍🔧 HIRE AGENT HERE</button>
   <button class="btn" id="ctxZoom">🔍 ZOOM IN</button>
+  <button class="btn" id="ctxShell" title="A new Terminal window in this project's folder">⌨ OPEN TERMINAL HERE</button>
+  <form id="ctxRun">
+    <input id="ctxCommand" placeholder="Run a command here…" aria-label="Command to run in this project's folder" autocomplete="off" spellcheck="false">
+    <button class="btn" type="submit" title="Runs it in a new Terminal window in this folder">▶ RUN</button>
+  </form>
+  <div id="ctxRecent"></div>
 </div>
 
 <div id="groundMenu" class="panel">

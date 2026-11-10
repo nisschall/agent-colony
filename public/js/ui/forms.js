@@ -47,7 +47,11 @@ export function openBuildingMenu(building, sx, sy) {
   const menu = document.getElementById('ctxMenu');
   document.getElementById('ctxTitle').textContent = building.name.toUpperCase();
   renderProblems(building);
-  document.getElementById('ctxHire').disabled = !building.project.path;
+  const noFolder = !building.project.path;
+  document.getElementById('ctxHire').disabled = noFolder;
+  document.getElementById('ctxShell').disabled = noFolder;
+  for (const control of document.querySelectorAll('#ctxRun input, #ctxRun button')) control.disabled = noFolder;
+  renderRecentCommands(building.name);
   menu.classList.add('open');
   menu.style.left = `${Math.min(sx, innerWidth - menu.offsetWidth - 8)}px`;
   menu.style.top = `${Math.min(sy, innerHeight - menu.offsetHeight - 8)}px`;
@@ -65,6 +69,60 @@ export function openGroundMenu(sx, sy) {
   menu.style.left = `${Math.min(sx, innerWidth - 240)}px`;
   menu.style.top = `${Math.min(sy, innerHeight - 60)}px`;
 }
+
+// ---- Terminal in a project's folder, and the commands you ran there lately (remembered in this browser) ----
+const RECENT_KEY = 'agentColony.recentCommands';
+const RECENT_LIMIT = 4;
+
+function recentCommands() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || {}; } catch { return {}; }
+}
+
+function rememberCommand(project, command) {
+  const all = recentCommands();
+  all[project] = [command, ...(all[project] || []).filter((c) => c !== command)].slice(0, RECENT_LIMIT);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(all)); } catch { /* storage unavailable */ }
+}
+
+function renderRecentCommands(project) {
+  const commands = recentCommands()[project] || [];
+  document.getElementById('ctxRecent').innerHTML = commands
+    .map((command) => `<button class="chip" type="button" data-command="${escapeHtml(command)}" title="Run again: ${escapeHtml(command)}">${escapeHtml(command)}</button>`).join('');
+}
+
+export async function openTerminalIn(project, command = '') {
+  const result = await api('/api/terminal', { project, command });
+  if (!result.ok) return false;
+  if (command) rememberCommand(project, command);
+  addToast(command ? `⌨ Running in Terminal: ${command}` : `⌨ Terminal opened in ${project}`, 'info');
+  return true;
+}
+
+document.getElementById('ctxShell').onclick = () => {
+  closeBuildingMenu();
+  openTerminalIn(menuBuilding.name);
+};
+
+document.getElementById('ctxRun').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('ctxCommand');
+  const command = input.value.trim();
+  if (!command) {
+    input.focus();
+    return;
+  }
+  if (await openTerminalIn(menuBuilding.name, command)) {
+    input.value = '';
+    closeBuildingMenu();
+  }
+});
+
+document.getElementById('ctxRecent').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-command]');
+  if (!chip) return;
+  closeBuildingMenu();
+  openTerminalIn(menuBuilding.name, chip.dataset.command);
+});
 
 function showFoundFields() {
   const isNew = document.getElementById('foundMode').value === 'new';

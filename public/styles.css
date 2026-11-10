@@ -224,6 +224,12 @@ canvas#world.dragging { cursor: grabbing; }
 #ctxMenu .label { padding: 4px 6px; }
 #ctxMenu button { display: block; width: 100%; text-align: left; margin-top: 4px; }
 #ctxMenu { max-width: 340px; }
+#ctxRun { display: flex; gap: 4px; margin-top: 4px; }
+#ctxRun input { flex: 1; min-width: 0; font-family: 'VT323', monospace; font-size: 18px; color: var(--cream); background: var(--edge); border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 4px 8px; }
+#ctxMenu #ctxRun button { width: auto; margin-top: 0; flex: none; }
+#ctxRecent { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+#ctxRecent:empty { display: none; }
+#ctxMenu #ctxRecent .chip { display: inline-block; width: auto; margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
 #ctxProblems .problem { padding: 2px 6px; line-height: 1; overflow-wrap: anywhere; }
 #ctxProblems .bad { color: var(--red); }
 #ctxProblems .wait { color: var(--gold); }
@@ -294,5 +300,6 @@ body.clan #btnMembers { display: block; }
 body.clan #clanSeg { display: inline-flex; }
 body.clan #clanSeg b { color: var(--gold); font-weight: normal; }
 body.clan #treasurySeg, body.clan #statusDetails, body.clan #btnRebuild, body.clan #btnCrew, body.clan #btnFame, body.clan #btnWard,
-body.clan #sheetExpand, body.clan #sheetStats, body.clan #sheetMoreToggle, body.clan #sheetMore, body.clan #ctxHire { display: none !important; }
+body.clan #sheetExpand, body.clan #sheetStats, body.clan #sheetMoreToggle, body.clan #sheetMore, body.clan #ctxHire,
+body.clan #ctxShell, body.clan #ctxRun, body.clan #ctxRecent, body.clan #btnShell { display: none !important; }
 body.clan #statusBar { cursor: default; }

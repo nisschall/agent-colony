@@ -43,6 +43,7 @@ To update, run `git pull` and then `./install-autostart.sh` again.
 - **When a hired agent stops,** its card says **🙋 Needs you** (it asked you something or was blocked) or **✓ Done**. Agents waiting on you also queue at the Review Office.
 - **Blocked actions:** if a hired agent tried something it isn't allowed to do, the card lists it. **Allow once & retry** re-runs it with only those actions allowed, for that one run.
 - **Release** (two clicks) sends a hired agent out of town. Its conversation stays in Claude's history.
+- **A shell in a project's folder:** click a building for **Open Terminal here**, or type a command in its **Run** box (for example `./mvnw test`) to run it in a new Terminal window in that folder. The last few commands you ran there come back as one-click chips. An agent's card has **⌨ Shell** for its project's folder. Commands always run in Terminal, where you can see and stop them, never hidden inside the server; the first time, macOS asks to let Agent Colony control Terminal.
 
 ### What hired agents may do
 
