@@ -1,5 +1,5 @@
 // Each linked Mac's latest report, and the combined town a clan sees: everyone's shared projects
-// (one building per repo, however many members work on it), their agents, who is waiting on whom, and activity.
+// (one building per repo, however many members work on it), their agents, who is waiting on whom, and updates.
 // Reports come from other people's machines, so every field is checked and trimmed before it is kept.
 
 const ONLINE_MS = 30 * 1000;
@@ -11,7 +11,8 @@ const TOWN_EVENTS = 100;
 const PROJECT_KEY = /^(git|local):[0-9a-f]{20}$/;
 const STATUSES = new Set(['working', 'overworked', 'stuck', 'waiting', 'idle', 'sleeping']);
 const AGENT_KINDS = new Set(['claude', 'codex', 'subagent']);
-const EVENT_KINDS = new Set(['build', 'review', 'alarm', 'waiting', 'error', 'hire', 'update', 'broke', 'fixed']);
+// Older Macs still send edits, titles, models and tool errors; the hub drops them so the clan sees only these.
+const EVENT_KINDS = new Set(['waiting', 'update', 'broke', 'fixed']);
 const CHECK_KINDS = new Set(['build', 'tests']);
 const TIERS = new Set(['cottage', 'house', 'office', 'tower', 'campus']);
 const RESTING = new Set(['idle', 'sleeping']);
@@ -53,7 +54,6 @@ function cleanProject(raw, clanIds) {
     clans: list(raw.clans, 50).filter((id) => clanIds.has(id)),
     profile: cleanProfile(raw.profile),
     failing: list(problems.failing, 2).filter((f) => CHECK_KINDS.has(f?.kind)).map((f) => ({ kind: f.kind, ts: number(f.ts) })),
-    errorsLastHour: number(problems.errorsLastHour),
     lastTs: number(raw.lastTs),
   };
 }
@@ -65,9 +65,6 @@ function cleanAgent(raw, projectKeys) {
     kind: AGENT_KINDS.has(raw.kind) ? raw.kind : 'claude',
     project: raw.project,
     status: raw.status,
-    title: text(raw.title, 80),
-    model: text(raw.model, 40),
-    activity: text(raw.activity, 80),
     waitingSince: number(raw.waitingSince),
     lastTs: number(raw.lastTs),
     // Only sent when the member chose to share their agents' updates.
@@ -103,7 +100,7 @@ function createTown(store) {
   function townProject(projects, key, name) {
     let project = projects.get(key);
     if (!project) {
-      project = { key, name, members: [], profile: null, failing: [], errorsLastHour: 0, agents: 0, active: 0, waiting: 0, lastTs: 0 };
+      project = { key, name, members: [], profile: null, failing: [], agents: 0, active: 0, waiting: 0, lastTs: 0 };
       projects.set(key, project);
     }
     return project;
@@ -138,7 +135,6 @@ function createTown(store) {
         project.members.push(user.login);
         if (shared.profile && (!project.profile || shared.profile.complexity > project.profile.complexity)) project.profile = shared.profile;
         project.failing.push(...shared.failing.map((f) => ({ ...f, owner: user.login })));
-        project.errorsLastHour += shared.errorsLastHour;
         project.lastTs = Math.max(project.lastTs, shared.lastTs);
       }
 

@@ -120,7 +120,10 @@ test('a clan sees everyone\'s shared projects, merged by repo, with who is waiti
   ], [
     { id: 'claude:a1', project: SHARED_REPO, status: 'waiting', waitingSince: 1000, title: 'Fix cart' },
     { id: 'claude:a2', project: ALICE_ONLY, status: 'working' },
-  ], [{ ts: Date.now(), kind: 'build', project: SHARED_REPO, agent: 'claude:a1', text: 'Rebuilt Cart.java (+3 −1)' }]));
+  ], [
+    { ts: Date.now(), kind: 'build', project: SHARED_REPO, agent: 'claude:a1', text: 'Rebuilt Cart.java (+3 −1)' },
+    { ts: Date.now(), kind: 'broke', project: SHARED_REPO, agent: 'claude:a1', text: 'Build failing in shop' },
+  ]));
   await call(bobMac, 'POST', '/api/report', report(clan.id, [
     { key: SHARED_REPO, name: 'shop', profile: { ...profile, complexity: 60 } },
     { key: BOB_PRIVATE, name: 'secret', clans: [] },
@@ -142,7 +145,9 @@ test('a clan sees everyone\'s shared projects, merged by repo, with who is waiti
   assert.ok(!town.projects.some((p) => p.name === 'secret'), 'an unshared project is not in the clan town');
   assert.deepStrictEqual(town.agents.map((a) => a.id).sort(), ['alice/claude:a1', 'alice/claude:a2', 'bob/claude:b1']);
   assert.deepStrictEqual(town.waitingOn, [{ login: 'alice', count: 1, oldestSince: 1000 }]);
-  assert.deepStrictEqual(town.events.map((e) => [e.owner, e.agent]), [['alice', 'alice/claude:a1']]);
+  assert.deepStrictEqual(town.events.map((e) => [e.owner, e.agent, e.kind]), [['alice', 'alice/claude:a1', 'broke']]);
+  const kept = JSON.stringify(town);
+  for (const dropped of ['Fix cart', 'Cart.java', 'errorsLastHour']) assert.ok(!kept.includes(dropped), `the town must not hold ${dropped}`);
   assert.ok(town.members.every((m) => m.online));
 
   const carol = await signInApproved('carol');

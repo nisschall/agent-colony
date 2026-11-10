@@ -18,8 +18,8 @@
   <span class="seg" id="clanSeg"></span>
   <span class="seg" id="treasurySeg"><span class="coin" id="coin"></span><b id="treasuryAmount">$0.00</b><span class="dim">of <span id="budgetLabel">$50</span></span><span class="bar mini" id="budgetBar"><i style="width:0"></i></span></span>
   <span class="seg" title="Working"><svg class="i" aria-hidden="true"><use href="/icons.svg#tools"></use></svg> <span id="popWorking">0</span></span>
-  <span class="seg" title="On a break"><svg class="i" aria-hidden="true"><use href="/icons.svg#coffee"></use></svg> <span id="popIdle">0</span></span>
-  <span class="seg" title="Asleep (quiet 45m+)"><svg class="i" aria-hidden="true"><use href="/icons.svg#bed"></use></svg> <span id="popSleeping">0</span></span>
+  <span class="seg" title="On a break" id="popIdleWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#coffee"></use></svg> <span id="popIdle">0</span></span>
+  <span class="seg" title="Asleep (quiet 45m+)" id="popSleepingWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#bed"></use></svg> <span id="popSleeping">0</span></span>
   <span class="seg" title="Overworked" id="popHotWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#fire"></use></svg> <span id="popHot">0</span></span>
   <span class="seg" title="Stuck (repeated errors)" id="popStuckWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#square-alert"></use></svg> <span id="popStuck">0</span></span>
   <span class="seg" title="Waiting on you — click to visit the first" id="popWaitWrap"><svg class="i" aria-hidden="true"><use href="/icons.svg#circle-question"></use></svg> <span id="popWait">0</span></span>
@@ -79,7 +79,7 @@
     </div>
     <div class="state-line" id="sheetState"></div>
     <div class="now" id="sheetNow"></div>
-    <div class="label section">TASK</div>
+    <div class="label section" id="taskLabel">TASK</div>
     <div class="task" id="sheetTask" title="Click to show all"></div>
     <div class="stats" id="sheetStats"></div>
     <button class="link" id="sheetMoreToggle">MORE STATS ▸</button>
@@ -95,8 +95,10 @@
       <ul class="blocked" id="blockedList"></ul>
       <button class="btn" id="btnRetry" title="Re-run it with only these actions allowed, for one run"><svg class="i" aria-hidden="true"><use href="/icons.svg#check"></use></svg> ALLOW ONCE &amp; RETRY</button>
     </div>
-    <div class="label section">ACTIVITY</div>
-    <ul class="activity" id="sheetActivity"></ul>
+    <div id="activityBox">
+      <div class="label section">ACTIVITY</div>
+      <ul class="activity" id="sheetActivity"></ul>
+    </div>
     <div id="filesBox">
       <div class="label section" id="filesLabel">FILES CHANGED</div>
       <ul class="files" id="sheetFiles"></ul>

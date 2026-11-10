@@ -14,7 +14,7 @@ test('clone URLs of the same repo normalize alike, without credentials', () => {
   assert.strictEqual(normalizeRemote(''), '');
 });
 
-test('the report holds only shared projects and leaves out commands, questions, paths and error text', () => {
+test('the report holds only shared projects and leaves out tasks, models, tools, files, questions and errors', () => {
   const now = Date.now();
   const snap = {
     projects: [
@@ -36,10 +36,10 @@ test('the report holds only shared projects and leaves out commands, questions, 
   };
   const report = buildReport(snap, { shop: ['clan1'] }, () => 'git:aaaaaaaaaaaaaaaaaaaa');
   assert.deepStrictEqual(report.projects.map((p) => p.name), ['shop']);
-  assert.deepStrictEqual(report.agents.map((a) => a.activity), ['Bash', 'Edit: Cart.java']);
-  assert.deepStrictEqual(report.events.map((e) => e.text), ['hit an error', 'Rebuilt Cart.java (+3 −1)', 'finished a task', 'is waiting for review']);
+  assert.deepStrictEqual(report.agents.map((a) => a.status), ['waiting', 'working']);
+  assert.deepStrictEqual(report.events.map((e) => e.text), ['is waiting for review']);
   const sent = JSON.stringify(report);
-  for (const secret of ['/Users/', 'TOKEN', 'password', 'hunter2', 'vault', 'mvnw', 'diary', 'today.md']) {
+  for (const secret of ['/Users/', 'TOKEN', 'password', 'hunter2', 'vault', 'mvnw', 'diary', 'today.md', 'Cart.java', 'Checkout', 'opus', 'Bash', 'errorsLastHour']) {
     assert.ok(!sent.includes(secret), `report must not contain ${secret}`);
   }
 });

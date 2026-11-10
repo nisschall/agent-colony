@@ -1,12 +1,12 @@
 // Sharing this colony with clans on a hub: linking this Mac to your GitHub account, choosing which projects
 // each clan sees, and sending the hub a short summary every few seconds.
-// Only that summary leaves the Mac: no transcripts, prompts, code, commands or folder paths. Agents' own
+// Only that summary leaves the Mac: projects, agents' status and build breaks. No transcripts, prompts, code,
+// commands, file names, folder paths, chat titles or models. Agents' own
 // end-of-turn summaries and the questions they ask you are added only if you turn on "share updates".
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
 const { ApiError } = require('./api-error');
 const { CLAN_FILE, PORT } = require('./config');
 const { WAITING_PREFIX } = require('./agents');
@@ -18,9 +18,7 @@ const LINK_MS = 30 * 60 * 1000;
 const MAX_PENDING_LINKS = 10;
 const REQUEST_TIMEOUT_MS = 10_000;
 const REMOTE_CACHE_MS = 10 * 60 * 1000;
-const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
-const BUILD_TEXT = /^(Built|Rebuilt|Patched) /;
-const EVENT_TEXT = { review: 'got new orders', alarm: 'was stopped', waiting: 'is waiting for review', error: 'hit an error', hire: 'hired a helper' };
+const GENERIC_WAITING = 'is waiting for review';
 const NOT_LINKED = 'This Mac is not linked to a hub yet.';
 const PORTAL_WAITING_PREFIX = 'needs you: ';
 
@@ -96,13 +94,6 @@ function projectKey(folder) {
   return key;
 }
 
-function safeActivity(lastAction) {
-  const [tool, ...rest] = String(lastAction || '').split(': ');
-  const target = rest.join(': ');
-  if (FILE_TOOLS.has(tool) && target) return `${tool}: ${path.basename(target)}`;
-  return tool;
-}
-
 function waitingQuestion(text) {
   for (const prefix of [WAITING_PREFIX, PORTAL_WAITING_PREFIX]) {
     if (text.startsWith(prefix)) return text.slice(prefix.length);
@@ -110,13 +101,12 @@ function waitingQuestion(text) {
   return '';
 }
 
+// Only what the clan's updates drawer shows leaves the Mac: no edits, file names or tool errors.
 function safeEventText(event, shareUpdates) {
-  if (event.kind === 'build') return BUILD_TEXT.test(event.text) ? event.text : 'finished a task';
-  if (event.kind === 'hire' && event.text.startsWith('was hired')) return 'was hired';
   if (event.kind === 'broke' || event.kind === 'fixed') return event.text;
   if (event.kind === 'update') return shareUpdates ? event.text : '';
-  if (event.kind === 'waiting' && shareUpdates) return waitingQuestion(event.text) || EVENT_TEXT.waiting;
-  return EVENT_TEXT[event.kind] || '';
+  if (event.kind === 'waiting') return (shareUpdates && waitingQuestion(event.text)) || GENERIC_WAITING;
+  return '';
 }
 
 // `shares` maps a project name to the clan ids that see it; `keyOf` turns a project folder into its hub key.
@@ -129,16 +119,13 @@ function buildReport(snap, shares, keyOf, shareUpdates = false) {
     if (!clans.length) continue;
     const key = keyOf(project.path);
     keys.set(project.name, key);
-    projects.push({ key, name: project.name, clans, profile: project.profile, lastTs: project.lastTs, problems: {
-      failing: (project.problems?.failing || []).map((f) => ({ kind: f.kind, ts: f.ts })),
-      errorsLastHour: project.problems?.errorsLastHour || 0,
-    } });
+    const failing = (project.problems?.failing || []).map((f) => ({ kind: f.kind, ts: f.ts }));
+    projects.push({ key, name: project.name, clans, profile: project.profile, lastTs: project.lastTs, problems: { failing } });
   }
   const agents = snap.agents
     .filter((agent) => keys.has(agent.workProject))
     .map((agent) => ({
       id: agent.id, kind: agent.kind, project: keys.get(agent.workProject), status: agent.status,
-      title: agent.title, model: agent.model, activity: safeActivity(agent.lastAction),
       waitingSince: agent.status === 'waiting' ? agent.waitingSince : 0, lastTs: agent.lastTs,
       summary: shareUpdates && agent.summary ? agent.summary : null,
       ask: shareUpdates && agent.status === 'waiting' ? agent.waitingAsk : '',

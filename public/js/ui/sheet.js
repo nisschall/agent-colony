@@ -37,7 +37,8 @@ export function renderSheet() {
   const agent = worker.agent;
   const hiredNote = agent.portal ? ` · ${HIRED_MARK} hired from the town` : agent.owner ? ` · ${agent.owner}'s agent` : '';
   document.getElementById('sheetName').textContent = worker.look.name;
-  document.getElementById('sheetClass').textContent = `${prettyModel(agent.model)} ${worker.look.className}${hiredNote}`;
+  const model = agent.model ? `${prettyModel(agent.model)} ` : '';
+  document.getElementById('sheetClass').textContent = `${model}${worker.look.className}${hiredNote}`;
   document.getElementById('sheetLevel').innerHTML = `${escapeHtml(agent.project)} · ${statusLabel(agent.status, agent.owner)}`;
   renderStateLine(agent);
   renderTask(agent);
@@ -56,10 +57,11 @@ export function renderSheet() {
 function stateLine(agent) {
   const now = Date.now();
   const portal = agent.portal;
-  const doing = agent.lastAction || 'getting started';
+  // A clan's town doesn't get members' tool steps.
+  const doing = CLAN_ID ? '' : ` · ${agent.lastAction || 'getting started'}`;
   if (portal && portal.running) {
     const runningFor = portal.startedAt ? ` for ${duration(now - portal.startedAt)}` : '';
-    return { kind: 'working', icon: 'tools', text: `Working${runningFor} · ${doing}` };
+    return { kind: 'working', icon: 'tools', text: `Working${runningFor}${doing}` };
   }
   const outcome = portal && portal.outcome;
   if (outcome && outcome.state === 'needs-you') return { kind: 'needs', icon: 'circle-question', text: `Needs you · ${outcome.summary}` };
@@ -71,8 +73,8 @@ function stateLine(agent) {
   if (agent.status === 'waiting') {
     return { kind: 'needs', icon: 'circle-question', text: `Waiting on you for ${duration(now - agent.waitingSince)} · ${agent.waitingAsk}` };
   }
-  if (agent.status === 'stuck' || agent.status === 'overworked') return { kind: 'trouble', icon: STATUS[agent.status].icon, text: `${STATUS[agent.status].text} · ${doing}` };
-  if (agent.status === 'working') return { kind: 'working', icon: 'tools', text: `Working · ${doing}` };
+  if (agent.status === 'stuck' || agent.status === 'overworked') return { kind: 'trouble', icon: STATUS[agent.status].icon, text: `${STATUS[agent.status].text}${doing}` };
+  if (agent.status === 'working') return { kind: 'working', icon: 'tools', text: `Working${doing}` };
   return { kind: '', icon: STATUS[agent.status].icon, text: `${STATUS[agent.status].text} · last active ${duration(now - agent.lastTs)} ago` };
 }
 

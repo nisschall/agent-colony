@@ -1,5 +1,5 @@
 // A clan's shared town from a hub, reshaped into the snapshot this page draws, so the same town shows it.
-// The hub only shares status, current tool and project facts, so per-agent stats and costs stay at zero.
+// The hub only shares status and project facts, so per-agent stats and costs stay at zero.
 import { LAYOUT_SEED } from './layout.js';
 
 const NO_TOKENS = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -19,9 +19,9 @@ function buildingNames(projects) {
 function townAgent(agent, projectName) {
   return {
     id: agent.id, kind: agent.kind, parentId: null, owner: agent.owner,
-    project: projectName, workProject: projectName, title: agent.title, model: agent.model,
+    project: projectName, workProject: projectName, title: '', model: '',
     status: agent.status, waiting: agent.status === 'waiting', waitingSince: agent.waitingSince, waitingAsk: agent.ask, summary: agent.summary,
-    lastAction: agent.activity, lastTs: agent.lastTs, firstTs: agent.lastTs,
+    lastAction: '', lastTs: agent.lastTs, firstTs: agent.lastTs,
     tokens: NO_TOKENS, context: 0, cost: 0, toolCalls: 0, toolErrors: 0, edits: 0, linesAdded: 0, linesRemoved: 0,
     filesTouched: 0, lastFile: '', lastHumanTs: 0, humanMsgs: 0, interrupts: 0, portal: null, today: null,
     stress: 0, burnPerHour: 0, recentErrors: 0, shiftHours: 0,
@@ -35,7 +35,7 @@ function townProject(project, name, agents) {
     agents: project.agents, active: project.active, errors: 0, lastTs: project.lastTs,
     waitingIds: here.filter((agent) => agent.waiting).map((agent) => agent.id),
     stack: '', profile: project.profile,
-    problems: { failing: project.failing.map((check) => ({ ...check, ok: false })), errorsLastHour: project.errorsLastHour },
+    problems: { failing: project.failing.map((check) => ({ ...check, ok: false })), errorsLastHour: 0 },
   };
 }
 

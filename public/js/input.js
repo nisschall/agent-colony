@@ -135,7 +135,8 @@ function updateHover(sx, sy) {
     const a = hit.worker.agent;
     const where = `${escapeHtml(a.project)}${siteOf(a) !== a.project ? ` → working on ${escapeHtml(siteOf(a))}` : ''}`;
     const detail = a.owner ? `${escapeHtml(a.owner)}'s agent${a.lastAction ? ` · ${escapeHtml(a.lastAction)}` : ''}` : `${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
-    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status, a.owner)} · ${where}<br>${detail}`;
+    const model = a.model ? ` · ${escapeHtml(prettyModel(a.model))}` : '';
+    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b>${model}<br>${statusLabel(a.status, a.owner)} · ${where}<br>${detail}`;
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
     if (a.status === 'waiting' && a.waitingAsk) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
     if (a.summary) html += `<br><span style="color:var(--muted)">${icon('message')} ${escapeHtml(a.summary.text)}</span>`;
