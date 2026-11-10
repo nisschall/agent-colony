@@ -2,7 +2,7 @@
 
 A live pixel town of every Claude Code and Codex agent on this Mac: who is working, waiting on you, burning out, and what it all costs. It reads the session logs in `~/.claude/projects` and `~/.codex/sessions`.
 
-**Version 0.1 — an early release.** It works day to day on one Mac, but expect rough edges, and update often (see [Known limits](#known-limits)).
+**Version 0.2 — an early release.** It works day to day on one Mac, but expect rough edges, and update often (see [Known limits](#known-limits)).
 
 ## Requirements
 
