@@ -150,10 +150,21 @@ function startWaiting(agent, ts, ask) {
   addEvent(agent, ts, 'waiting', `is waiting for your review: ${agent.waitingAsk.slice(0, 60)}`);
 }
 
-// A turn that ends on a pending question (desktop wrap-up "ask", or a closing "?") is blocked on you.
+const LIST_LINE = /^\s*(?:[-*•]|\d+[.)])\s+|^\s{2,}\S/;
+
+// The question a closing message ends on, if any. Options listed after the question (1. … 2. …) don't hide it;
+// a question only quoted mid-message, with a statement after it, doesn't count.
+function closingQuestion(text) {
+  const lines = text.trim().split('\n');
+  while (lines.length && (LIST_LINE.test(lines[lines.length - 1]) || !lines[lines.length - 1].trim())) lines.pop();
+  const last = lines.join('\n').trim().replace(/[*_`]+$/, '');
+  if (!last.endsWith('?')) return '';
+  return last.split(/(?<=[.!:\n])\s+/).pop().replace(/^[*_`]+/, '');
+}
+
+// A turn that ends on a pending question (desktop wrap-up "ask", or a closing question) is blocked on you.
 function endTurn(agent, ts) {
-  const closingText = agent.lastText.trim();
-  const ask = agent.pendingAsk || (closingText.endsWith('?') ? closingText.split(/(?<=[.!\n])\s+/).pop() : '');
+  const ask = agent.pendingAsk || closingQuestion(agent.lastText);
   agent.pendingAsk = '';
   if (ask) startWaiting(agent, ts, ask);
   else agent.waiting = false;

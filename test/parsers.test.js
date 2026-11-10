@@ -102,6 +102,23 @@ test('a turn ending on a question waits; one ending on a statement does not', ()
   assert.strictEqual(agent.waiting, false);
 });
 
+test('a question followed by a list of options still waits on you', () => {
+  const { agent } = newAgent();
+  const text = 'Both drafts are ready.\n\nSo I need one answer before writing Draft 7: **which app repository do SaaS tenants run?**\n\n'
+    + '1. One shared repository for everyone (`cybervisible`).\n2. A repository chosen per tenant, which would mean\n   a new field when approving.';
+  assistant(agent, [{ type: 'text', text }], { stop_reason: 'end_turn' });
+  assert.strictEqual(agent.waiting, true);
+  assert.strictEqual(agent.waitingAsk, 'which app repository do SaaS tenants run?');
+});
+
+test('a question quoted mid-message, or a closing list with no question, does not wait', () => {
+  const { agent } = newAgent();
+  assistant(agent, [{ type: 'text', text: 'It answers the prospect who asks "why pay when Claude can do OSINT?" well.\n\nThe next step I recommend is change tracking.' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(agent.waiting, false);
+  assistant(agent, [{ type: 'text', text: 'Here is what changed:\n\n- the parser\n- the tests' }], { stop_reason: 'end_turn' });
+  assert.strictEqual(agent.waiting, false);
+});
+
 test('a desktop wrap-up ask waits on you', () => {
   const { agent } = newAgent();
   assistant(agent, [{ type: 'tool_use', id: 'wu', name: 'mcp__ccd_turn__wrap_up', input: { recap: 'Fixed.', ask: 'Commit this?' } }]);
