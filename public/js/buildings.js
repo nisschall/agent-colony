@@ -146,13 +146,16 @@ function agentName(agentId) {
 // What's wrong in a building, worst first. Lines with an agentId can take you to that agent.
 export function problemLines(b) {
   const health = buildingHealth(b);
-  const lines = health.failing.map((check) => ({
-    tone: 'bad',
-    agentId: check.agentId,
-    text: `⚠ ${check.kind === 'tests' ? 'Tests' : 'Build'} failing · ${check.command} · ${duration(Date.now() - check.ts)} ago · ${agentName(check.agentId)}`,
-  }));
+  // In a clan's town a check names the member it belongs to, and carries no command.
+  const lines = health.failing.map((check) => {
+    const parts = [`⚠ ${check.kind === 'tests' ? 'Tests' : 'Build'} failing`, check.command, `${duration(Date.now() - check.ts)} ago`, check.owner || agentName(check.agentId)];
+    return { tone: 'bad', agentId: check.agentId, text: parts.filter(Boolean).join(' · ') };
+  });
   if (health.errors) lines.push({ tone: health.smoking ? 'bad' : 'muted', text: `💨 ${health.errors} tool error${health.errors > 1 ? 's' : ''} in the last hour` });
-  for (const agentId of b.project.waitingIds || []) lines.push({ tone: 'wait', agentId, text: `🙋 ${agentName(agentId)} is waiting on you` });
+  for (const agentId of b.project.waitingIds || []) {
+    const owner = state.workers.get(agentId)?.agent.owner;
+    lines.push({ tone: 'wait', agentId, text: `🙋 ${agentName(agentId)} is waiting on ${owner || 'you'}` });
+  }
   return lines;
 }
 

@@ -130,6 +130,14 @@ function showsNameTag(worker) {
   return noteworthy || worker.agent.id === state.selectedId || worker.agent.id === state.hoverId;
 }
 
+// In a clan's town the review queue belongs to several people, so the sign says whose it is.
+function waitingLabel(queue) {
+  const clan = state.data.clan;
+  if (!clan) return `🙋 ${queue} WAITING ON YOU`;
+  const whose = clan.waitingOn.slice(0, 3).map((w) => `${w.login} ${w.count}`).join(' · ');
+  return `🙋 ${queue} WAITING · ${whose}`;
+}
+
 function drawLabels() {
   const m = worldToScreenMatrix();
   const zoom = state.camera.zoom;
@@ -147,6 +155,7 @@ function drawLabels() {
       active ? `${active}⚒` : '',
       failing ? `⚠ ${failing} failing` : health.smoking ? `⚠ ${health.errors} errors` : '',
       health.waiting ? `🙋 ${health.waiting}` : '',
+      building.project.members?.length > 1 ? `👥 ${building.project.members.length}` : '',
     ];
     const text = parts.filter(Boolean).join(' · ');
     const at = toScreen(m, building.x, building.labelY);
@@ -160,15 +169,16 @@ function drawLabels() {
   pill(`🎮 REC CENTER${inside ? ` · 💤 ${inside} inside` : ''}`, rec.x, rec.y, 14, '#f4e9c9', 'rgba(27,20,40,.8)');
   const queue = reviewQueue().length;
   const office = toScreen(m, OFFICE.x, OFFICE.y - 48);
-  if (queue) pill(`🙋 ${queue} WAITING ON YOU`, office.x, office.y, 18, '#1b1428', '#ffcc33');
+  if (queue) pill(waitingLabel(queue), office.x, office.y, 18, '#1b1428', '#ffcc33');
 
   if (zoom >= 0.8) {
     const nameSize = zoom >= 2 ? 15 : 13;
     for (const worker of state.workers.values()) {
       if (!showsNameTag(worker)) continue;
       const at = toScreen(m, worker.x, worker.y + 9);
+      const owner = worker.agent.owner ? ` · ${worker.agent.owner}` : '';
       if (worker.agent.portal) pill(`${HIRED_MARK} ${worker.look.name}`, at.x, at.y, nameSize, HIRED_VEST, 'rgba(27,20,40,.8)');
-      else pill(worker.look.name, at.x, at.y, nameSize, '#f4e9c9', 'rgba(27,20,40,.7)');
+      else pill(`${worker.look.name}${owner}`, at.x, at.y, nameSize, '#f4e9c9', 'rgba(27,20,40,.7)');
     }
   }
   const you = toScreen(m, YOU.x, YOU.y + 9);

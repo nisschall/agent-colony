@@ -6,15 +6,17 @@
 <title>Agent Colony</title>
 <meta name="colony-token" content="__COLONY_TOKEN__">
 <meta name="colony-layout" content="__COLONY_LAYOUT__">
+<meta name="colony-clan" content="__COLONY_CLAN__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <canvas id="world"></canvas>
 
 <div id="statusBar" class="panel" title="Click for details">
-  <span class="seg"><span class="coin" id="coin"></span><b id="treasuryAmount">$0.00</b><span class="dim">of <span id="budgetLabel">$50</span></span><span class="bar mini" id="budgetBar"><i style="width:0"></i></span></span>
+  <span class="seg" id="clanSeg"></span>
+  <span class="seg" id="treasurySeg"><span class="coin" id="coin"></span><b id="treasuryAmount">$0.00</b><span class="dim">of <span id="budgetLabel">$50</span></span><span class="bar mini" id="budgetBar"><i style="width:0"></i></span></span>
   <span class="seg" title="Working">⚒ <span id="popWorking">0</span></span>
   <span class="seg" title="On a break">☕ <span id="popIdle">0</span></span>
   <span class="seg" title="Asleep (quiet 45m+)">💤 <span id="popSleeping">0</span></span>
@@ -47,6 +49,8 @@
   <button class="btn" id="btnHome" title="Show the whole town">⌂</button>
   <button class="btn" id="btnTime" title="Time of day: LIVE">⏰</button>
   <button class="btn" id="btnRebuild" title="Rebuild the town with a new layout">🎲</button>
+  <button class="btn" id="btnClans" title="Clans: share projects with your team">🛡</button>
+  <button class="btn" id="btnMembers" title="Clan members">👥</button>
 </div>
 
 <div id="sheet" class="panel">
@@ -182,8 +186,14 @@
   <div class="px">AGENT COLONY</div>
   <div>Surveying the land<span class="dots"></span></div>
   <div id="loadingHint" style="color:var(--muted)">Reading agent logs from ~/.claude and ~/.codex</div>
+<div id="clans" class="panel">
+  <span class="close" id="clansClose">X</span>
+  <h2>🛡 CLANS</h2>
+  <div id="clansBody"></div>
 </div>
 
-<script type="module" src="js/main.js"></script>
+</div>
+
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

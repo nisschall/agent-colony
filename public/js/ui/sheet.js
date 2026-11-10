@@ -1,4 +1,5 @@
 // The agent card: whether it needs you, its task, activity and files, and (expanded) a conversation you can type into.
+import { CLAN_ID } from '../config.js';
 import { addToast, autonomy, statusLabel } from '../hud.js';
 import { efficiency, levelOf, levelProgress, prettyModel, xpOf } from '../identity.js';
 import { HIRED_MARK, drawPerson } from '../people.js';
@@ -34,10 +35,10 @@ export function renderSheet() {
     return;
   }
   const agent = worker.agent;
-  const hiredNote = agent.portal ? ` · ${HIRED_MARK} hired from the town` : '';
+  const hiredNote = agent.portal ? ` · ${HIRED_MARK} hired from the town` : agent.owner ? ` · ${agent.owner}'s agent` : '';
   document.getElementById('sheetName').textContent = worker.look.name;
   document.getElementById('sheetClass').textContent = `${prettyModel(agent.model)} ${worker.look.className}${hiredNote}`;
-  document.getElementById('sheetLevel').textContent = `${agent.project} · ${statusLabel(agent.status)}`;
+  document.getElementById('sheetLevel').textContent = `${agent.project} · ${statusLabel(agent.status, agent.owner)}`;
   renderStateLine(agent);
   renderTask(agent);
   renderStats(agent);
@@ -63,6 +64,7 @@ function stateLine(agent) {
   const outcome = portal && portal.outcome;
   if (outcome && outcome.state === 'needs-you') return { kind: 'needs', text: `🙋 Needs you · ${outcome.summary}` };
   if (outcome) return { kind: 'done', text: `✓ Done ${duration(now - outcome.ts)} ago · ready for the next task` };
+  if (agent.status === 'waiting' && agent.owner) return { kind: 'needs', text: `🙋 Waiting on ${agent.owner} for ${duration(now - agent.waitingSince)}` };
   if (agent.status === 'waiting') {
     return { kind: 'needs', text: `🙋 Waiting on you for ${duration(now - agent.waitingSince)} · ${agent.waitingAsk}` };
   }
@@ -215,7 +217,7 @@ function renderOrdersBox(agent) {
   document.getElementById('btnTerminal').style.display = portal ? '' : 'none';
   document.getElementById('btnStop').style.display = running ? '' : 'none';
   document.getElementById('btnRelease').style.display = portal ? '' : 'none';
-  document.getElementById('watchOnlyNote').textContent = portal ? '' : WATCH_ONLY;
+  document.getElementById('watchOnlyNote').textContent = portal ? '' : agent.owner ? `Watch-only: only ${agent.owner} can talk to this agent.` : WATCH_ONLY;
   document.getElementById('replyBox').classList.toggle('open', Boolean(outcome && outcome.reply));
   if (!portal) return;
   if (outcome) document.getElementById('sheetReply').textContent = outcome.reply;
@@ -230,7 +232,8 @@ function renderOrdersBox(agent) {
 
 async function refreshDetails() {
   const agentId = state.selectedId;
-  if (!agentId || document.visibilityState !== 'visible') return;
+  // A clan's town never gets transcripts: only the agent's status and current tool are shared.
+  if (CLAN_ID || !agentId || document.visibilityState !== 'visible') return;
   const result = await api(`/api/agents/${encodeURIComponent(agentId)}/conversation`, {}, true);
   if (agentId !== state.selectedId || !result.ok) return;
   details = result;

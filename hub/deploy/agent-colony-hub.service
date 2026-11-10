@@ -1,0 +1,24 @@
+# systemd unit for the clan hub. Install as /etc/systemd/system/agent-colony-hub.service, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now agent-colony-hub
+[Unit]
+Description=Agent Colony clan hub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=colony
+WorkingDirectory=/opt/agent-colony/hub
+# --experimental-sqlite is needed on Node 22.5–22.12 and harmless on later versions.
+ExecStart=/usr/bin/node --experimental-sqlite --env-file=/opt/agent-colony/hub/.env server.js
+Restart=always
+UMask=0077
+RestartSec=3
+# The hub writes only its database (and backups) inside hub/.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/agent-colony/hub
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

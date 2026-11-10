@@ -1,0 +1,6 @@
+# Caddy gets and renews the HTTPS certificate for this name by itself.
+# Install as /etc/caddy/Caddyfile, then: sudo systemctl reload caddy
+140-245-26-67.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:4800
+}

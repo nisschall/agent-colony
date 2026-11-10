@@ -1,4 +1,5 @@
 // The status bar, chronicle, toasts and clock.
+import { CLAN_ID } from './config.js';
 import { lighting } from './lighting.js';
 import { currentReviewee, reviewQueue } from './simulation.js';
 import { state } from './state.js';
@@ -30,7 +31,8 @@ function renderChronicle() {
   const items = chronicle.slice(-7).reverse();
   list.innerHTML = items.map((event) => {
     const worker = state.workers.get(event.agentId);
-    const who = worker ? `${worker.look.name}@${worker.agent.project}` : event.project || 'someone';
+    const owner = worker && worker.agent.owner ? ` (${worker.agent.owner})` : '';
+    const who = worker ? `${worker.look.name}${owner}@${worker.agent.project}` : event.project || 'someone';
     return `<li data-id="${escapeHtml(event.agentId)}" class="${event.kind}"><span class="t">${clockTime(event.ts)}</span>${escapeHtml(who)} ${escapeHtml(event.text)}</li>`;
   }).join('') || '<li style="color:var(--muted)">All quiet in the colony…</li>';
 }
@@ -63,9 +65,19 @@ budgetInput.addEventListener('change', () => {
 
 let lastCostToday = null;
 
+function renderClanSeg(clan) {
+  const online = clan.members.filter((member) => member.online).length;
+  document.getElementById('clanSeg').innerHTML = `🛡 <b>${escapeHtml(clan.name)}</b><span class="dim">${online}/${clan.members.length} online</span>`;
+  document.getElementById('popWaitWrap').title = clan.waitingOn.length
+    ? `Waiting on ${clan.waitingOn.map((w) => `${w.login} (${w.count})`).join(', ')} — click to visit the first`
+    : 'Nobody is being waited on';
+  document.title = `${clan.name} · Agent Colony`;
+}
+
 export function renderHud() {
   const data = state.data;
   if (!data) return;
+  if (data.clan) renderClanSeg(data.clan);
   const costToday = data.totals.costToday;
   const amount = document.getElementById('treasuryAmount');
   amount.textContent = money(costToday);
@@ -104,7 +116,8 @@ export function renderHud() {
   if (document.getElementById('crew').classList.contains('open')) renderCrew();
 }
 
-export function statusLabel(status) {
+export function statusLabel(status, owner) {
+  if (status === 'waiting' && owner) return `🙋 Waiting on ${owner}`;
   return { working: '⚒ Working', idle: '☕ On break', sleeping: '💤 Asleep', overworked: '🔥 Overworked', stuck: '❗ Stuck', waiting: '🙋 Waiting on you' }[status];
 }
 
@@ -114,6 +127,7 @@ export function autonomy(agent) {
 }
 
 document.getElementById('statusBar').addEventListener('click', () => {
+  if (CLAN_ID) return;
   document.getElementById('statusDetails').classList.toggle('open');
 });
 

@@ -1,5 +1,5 @@
 // Talking to the server, plus the building menu, new app / new chat and hire forms.
-import { API_TOKEN, FLOOR_H } from '../config.js';
+import { API_TOKEN, CLAN_ID, FLOOR_H } from '../config.js';
 import { addToast } from '../hud.js';
 import { state } from '../state.js';
 import { escapeHtml, money } from '../utils.js';
@@ -63,6 +63,7 @@ export function openGroundMenu(sx, sy) {
   menu.classList.add('open');
   menu.style.left = `${Math.min(sx, innerWidth - 240)}px`;
   menu.style.top = `${Math.min(sy, innerHeight - 60)}px`;
+  if (CLAN_ID) return;
 }
 
 function showFoundFields() {

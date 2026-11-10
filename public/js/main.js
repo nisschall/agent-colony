@@ -1,6 +1,6 @@
 // Agent Colony page entry point: wallpaper hooks, the frame loop and start-up.
 import { fitCamera, resize } from './camera.js';
-import { PARAMS, WALLPAPER, WALLPAPER_FRAME_MS } from './config.js';
+import { CLAN_ID, PARAMS, WALLPAPER, WALLPAPER_FRAME_MS } from './config.js';
 import { updateClock } from './hud.js';
 import { render } from './render.js';
 import { paintGround, placeScenery } from './scenery.js';
@@ -8,6 +8,8 @@ import { update } from './simulation.js';
 import { liteMode, setLiteMode, state } from './state.js';
 import { connect } from './sync.js';
 import { drawCrewPortraits } from './ui/boards.js';
+// The Clans panel attaches its handlers when this loads.
+import './ui/clans.js';
 import { closeBuildingMenu, closeHireForm, openFoundForm } from './ui/forms.js';
 import { selectWorker } from './ui/sheet.js';
 // Mouse and keyboard handlers attach themselves when this loads.
@@ -59,6 +61,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+if (CLAN_ID) document.body.classList.add('clan');
 paintGround();
 placeScenery();
 resize();

@@ -71,7 +71,8 @@ function byImportance(a, b) {
 }
 
 // `ready` is false until the first full scan of the logs has finished.
-function snapshot(ready) {
+// `only` (project names) replaces the town's busiest-projects pick, for sharing chosen projects with a clan.
+function snapshot(ready, only = null) {
   const now = Date.now();
   const today = dayKey(now);
   const weekKeys = recentDayKeys(now);
@@ -125,18 +126,17 @@ function snapshot(ready) {
       status, ...stress,
     });
   }
-  const sortedProjects = [...projects.values()]
-    .filter((project) => !isAppInternal(project.path))
-    .sort(byImportance)
-    .slice(0, BUILDING_PLOTS);
-  for (const project of sortedProjects) {
+  const shown = only
+    ? [...projects.values()].filter((project) => only.includes(project.name))
+    : [...projects.values()].filter((project) => !isAppInternal(project.path)).sort(byImportance).slice(0, BUILDING_PLOTS);
+  for (const project of shown) {
     project.stack = stackOf(project.path);
     project.profile = profileOf(project.path);
     project.problems = problemsOf(project.name, now);
   }
   const sortedEvents = events.slice().sort((a, b) => a.ts - b.ts).slice(-80);
   return {
-    now, ready, agents: roster, projects: sortedProjects, events: sortedEvents,
+    now, ready, agents: roster, projects: shown, events: sortedEvents,
     defaults: { projectsFolder: DEFAULT_PROJECTS_FOLDER },
     layoutSeed: currentTownSeed(),
     totals: {

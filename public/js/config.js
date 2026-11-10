@@ -2,6 +2,8 @@
 
 // The server writes these into the page's <meta> tags each time it serves it.
 export const API_TOKEN = document.querySelector('meta[name="colony-token"]').content;
+// Set when a clan hub serves this page as that clan's shared town, instead of this Mac's own town.
+export const CLAN_ID = document.querySelector('meta[name="colony-clan"]').content;
 export const PARAMS = new URLSearchParams(location.search);
 export const WALLPAPER = PARAMS.has('wallpaper');
 export const WALLPAPER_FRAME_MS = 66;

@@ -7,7 +7,8 @@
   "repository": "github:nisschall/agent-colony",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js",
+    "test:hub": "npm --prefix hub test"
   },
   "engines": {
     "node": ">=18"

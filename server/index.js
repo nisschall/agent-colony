@@ -6,6 +6,7 @@ const http = require('http');
 const { agents } = require('./agents');
 const { ApiError } = require('./api-error');
 const { API_TOKEN, PORT, PUBLIC_DIR } = require('./config');
+const { clanStatus, finishLink, setShares, startLink, startPushing, unlink } = require('./clan');
 const { conversationOf } = require('./conversation');
 const { foundProject, hireAgent, openInTerminal, releaseAgent, retryBlocked, sendOrders, stopAgent } = require('./portal');
 const { discover, files, poll } = require('./scanner');
@@ -55,6 +56,16 @@ async function handleApi(req, res) {
   if (req.url === '/api/found') {
     const agentId = foundProject(body);
     return sendJson(res, 200, { ok: true, message: 'Project started.', agentId });
+  }
+  if (req.url === '/api/clan/status') return sendJson(res, 200, { ok: true, message: '', agentId: null, ...(await clanStatus()) });
+  if (req.url === '/api/clan/link') return sendJson(res, 200, { ok: true, message: 'Sign in on the hub to link this Mac.', agentId: null, url: startLink(body.hub) });
+  if (req.url === '/api/clan/unlink') {
+    await unlink();
+    return sendJson(res, 200, { ok: true, message: 'This Mac is no longer linked to the hub.', agentId: null });
+  }
+  if (req.url === '/api/clan/shares') {
+    const shares = setShares(body.project, body.clans);
+    return sendJson(res, 200, { ok: true, message: 'Sharing updated.', agentId: null, shares });
   }
   if (req.url === '/api/town/rebuild') {
     rebuildTown(body.seed);
@@ -130,13 +141,28 @@ const server = http.createServer((req, res) => {
       template = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
     } catch (error) {
       console.error(`Could not read the page: ${error.message}`);
+  // The hub sends the browser back here after you sign in, to finish linking this Mac.
+  if (pathname === '/clan/linked') {
+    const query = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    finishLink(query)
+      .then(() => {
+        res.writeHead(302, { Location: '/?clan=linked' });
+        res.end();
+      })
+      .catch((error) => {
+        res.writeHead(error.status || 500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(`Could not link this Mac: ${error.message}`);
+      });
+    return;
+  }
       res.writeHead(500);
       res.end();
       return;
     }
     const page = template
       .replace('__COLONY_TOKEN__', API_TOKEN)
-      .replace('__COLONY_LAYOUT__', String(currentTownSeed()));
+      .replace('__COLONY_LAYOUT__', String(currentTownSeed()))
+      .replace('__COLONY_CLAN__', '');
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(page);
     return;
@@ -156,3 +182,4 @@ server.listen(PORT, '127.0.0.1', () => {
   setInterval(() => { poll(); broadcast(); }, 2000);
   setInterval(discover, 15000);
 });
+  startPushing();

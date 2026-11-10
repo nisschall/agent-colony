@@ -16,6 +16,10 @@ export function renderBoard(mode) {
   const board = document.getElementById('board');
   const agents = state.data ? state.data.agents.slice() : [];
   let rows;
+  if (mode === 'members') {
+    renderMembers(board);
+    return;
+  }
   if (mode === 'fame') {
     document.getElementById('boardTitle').textContent = '🏆 HALL OF FAME — last 24h';
     agents.sort((a, b) => xpOf(b) - xpOf(a));
@@ -45,12 +49,30 @@ export function renderBoard(mode) {
   if (!rows.length) board.querySelector('#boardBody').innerHTML = '<p>No agents have worked in the last 24 hours.</p>';
 }
 
+// A clan's members: who is online, how many agents they have here, and how many are waiting on them.
+function renderMembers(board) {
+  const clan = state.data && state.data.clan;
+  document.getElementById('boardTitle').textContent = `👥 ${clan ? clan.name.toUpperCase() : 'CLAN'} — MEMBERS`;
+  const members = clan ? clan.members.slice().sort((a, b) => b.waiting - a.waiting || b.online - a.online || b.agents - a.agents) : [];
+  const rows = members.map((m) => {
+    const seen = m.online ? '<span style="color:var(--green)">● online</span>' : `<span style="color:var(--muted)">${m.lastSeen ? `seen ${duration(Date.now() - m.lastSeen)} ago` : 'not linked yet'}</span>`;
+    const waiting = m.waiting ? `<span style="color:var(--gold)">${m.waiting}</span>` : '<span style="color:var(--muted)">0</span>';
+    const name = m.name && m.name !== m.login ? ` <span style="color:var(--muted)">${escapeHtml(m.name)}</span>` : '';
+    return `<tr><td>${escapeHtml(m.login)}${name}</td><td>${m.role === 'leader' ? 'Leader' : 'Member'}</td><td>${seen}</td>`
+      + `<td class="num">${m.agents}</td><td class="num">${waiting}</td></tr>`;
+  });
+  board.querySelector('#boardBody').innerHTML = rows.length
+    ? `<table><tr><th>MEMBER</th><th>ROLE</th><th>STATUS</th><th class="num">AGENTS</th><th class="num">WAITING ON THEM</th></tr>${rows.join('')}</table>`
+    : '<p>No members yet.</p>';
+}
+
 function toggleBoard(mode) {
   const board = document.getElementById('board');
   const open = board.classList.contains('open') && state.boardMode === mode;
   board.classList.toggle('open', !open);
   document.getElementById('btnFame').classList.toggle('on', !open && mode === 'fame');
   document.getElementById('btnWard').classList.toggle('on', !open && mode === 'ward');
+  document.getElementById('btnMembers').classList.toggle('on', !open && mode === 'members');
   if (!open) renderBoard(mode);
 }
 
@@ -185,6 +207,7 @@ document.getElementById('crewGrid').addEventListener('click', (e) => {
 
 document.getElementById('btnFame').onclick = () => toggleBoard('fame');
 document.getElementById('btnWard').onclick = () => toggleBoard('ward');
+document.getElementById('btnMembers').onclick = () => toggleBoard('members');
 document.getElementById('boardClose').onclick = () => toggleBoard(state.boardMode);
 document.getElementById('boardBody').addEventListener('click', (e) => {
   const row = e.target.closest('tr[data-id]');

@@ -65,8 +65,18 @@ Open http://localhost:4747 (full game) or http://localhost:4747/?wallpaper (slim
 - Agents hired from the town may edit files in their project and run the commands in `ALLOWED_TOOLS` (`server/config.js`).
 
 ## Privacy
+## Clans
 
-Everything stays on your Mac. The server only listens on `127.0.0.1`, reads your local session logs, and sends nothing anywhere. `town.json` and `portal-agents.json` (your layout and hired agents) are written next to the code and are not committed.
+A clan is a shared town: everyone's shared projects, their agents, who is waiting on whom, and recent activity, on a hub your team hosts (setup in [hub/README.md](hub/README.md)). You can be in several clans and pick which projects each one sees.
+
+1. On the hub, sign in with GitHub. Unless you are a hub admin (or in the organisation the hub trusts), wait for an admin to let you in. Then create a clan, or join one with an invite code.
+2. In your town, click **🛡** in the toolbar, enter the hub's address and **Link with GitHub**. You sign in on the hub in your browser and come back linked.
+3. In the same panel, tick which projects each clan sees. **Open town** shows the clan's town.
+
+Unlinking (in the panel, or on the hub's page) stops sharing straight away.
+
+
+Everything stays on your Mac unless you link it to a clan hub. The server only listens on `127.0.0.1` and reads your local session logs. Once linked, it sends the hub a short summary of the projects you chose to share, and nothing about the others. That summary has no transcripts, prompts, code, commands or folder paths: the full list is in [hub/README.md](hub/README.md#what-members-share). `town.json`, `portal-agents.json` and `clan.json` (your layout, hired agents and hub link) are written next to the code and are not committed.
 
 ## Known limits
 
@@ -81,7 +91,13 @@ Everything stays on your Mac. The server only listens on `127.0.0.1`, reads your
 npm test
 ```
 
-The tests run sample Claude Code and Codex transcript lines through the log parsers, so a change in either log format shows up there first.
+The tests run sample Claude Code and Codex transcript lines through the log parsers, so a change in either log format shows up there first, and check what this Mac sends a clan hub.
+
+The clan hub has its own tests, which need Node 22 (see [hub/README.md](hub/README.md)):
+
+```bash
+npm run test:hub
+```
 
 ## Project layout
 
@@ -99,6 +115,8 @@ No npm dependencies and no build step: the server is plain Node, and the page lo
 | `server/conversation.js` | An agent's conversation, actions and changed files, for its card |
 | `server/checks.js` | Failing builds and tests, and recent errors, per project |
 | `server/town.js`, `server/pricing.js`, `server/config.js` | Layout seed, model prices, settings |
+| `server/clan.js` | Linking this Mac to a clan hub, choosing shared projects, sending the summary |
+| `hub/` | The clan hub: GitHub sign-in, approvals, clans, SQLite storage and deploy files (runs on a server, Node 22) |
 | `public/index.html`, `public/styles.css` | Page markup and styles |
 | `public/js/main.js` | Page entry point: wallpaper hooks, frame loop, start-up |
 | `public/js/sync.js`, `simulation.js` | Live data from the server; where agents go and how they move |
@@ -108,7 +126,7 @@ No npm dependencies and no build step: the server is plain Node, and the page lo
 | `public/js/hud.js`, `input.js`, `ui/` | Status bar and chronicle, mouse and keyboard, panels and forms |
 | `public/js/config.js`, `state.js`, `utils.js`, `identity.js` | Settings, shared state, helpers, agent names and looks |
 | `macos/` | The live-wallpaper app (Swift) |
-| `test/` | Log parser tests (`npm test`) |
+| `test/` | Log parser and clan summary tests (`npm test`; the hub's are `npm run test:hub`) |
 
 ## Licence
 

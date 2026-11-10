@@ -14,6 +14,7 @@ const ROOT = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const PORTAL_FILE = path.join(ROOT, 'portal-agents.json');
 const TOWN_FILE = path.join(ROOT, 'town.json');
+const CLAN_FILE = path.join(ROOT, 'clan.json');
 // Only the game page knows this token, so other web pages can't drive the spawn endpoints.
 const API_TOKEN = crypto.randomBytes(24).toString('hex');
 const MODELS = ['opus', 'sonnet', 'haiku'];
@@ -30,4 +31,4 @@ const ALLOWED_TOOLS = [
   'Bash(./mvnw compile:*)', 'Bash(./mvnw test:*)', 'Bash(./gradlew build:*)', 'Bash(./gradlew test:*)',
 ];
 
-module.exports = { PUBLIC_DIR, PORT, HISTORY_DAYS, CLAUDE_DIR, CODEX_DIR, MIN, CLAUDE_BIN, PORTAL_FILE, TOWN_FILE, API_TOKEN, MODELS, DEFAULT_PROJECTS_FOLDER, ALLOWED_TOOLS };
+module.exports = { PUBLIC_DIR, PORT, HISTORY_DAYS, CLAUDE_DIR, CODEX_DIR, MIN, CLAUDE_BIN, PORTAL_FILE, TOWN_FILE, CLAN_FILE, API_TOKEN, MODELS, DEFAULT_PROJECTS_FOLDER, ALLOWED_TOOLS };

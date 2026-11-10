@@ -1,6 +1,7 @@
 // Live data from the server: applying snapshots, placing buildings and reacting to changes.
 import { TIERS, addonsFor, floorsFor, varietyFor } from './buildings.js';
-import { CODE_GLYPHS, FLOOR_H, FOUNTAIN, PARK, TILE, WALLPAPER, WALLS } from './config.js';
+import { clanSnapshot } from './clan.js';
+import { CLAN_ID, CODE_GLYPHS, FLOOR_H, FOUNTAIN, PARK, TILE, WALLPAPER, WALLS } from './config.js';
 import { addChronicle, addToast, ingestEvents, renderHud } from './hud.js';
 import { identity } from './identity.js';
 import { LAYOUT_SEED, LOTS, YOU } from './layout.js';
@@ -141,7 +142,7 @@ function reactToChanges(worker, before, after) {
       addToast(`❗ ${look.name} @ ${after.project} is stuck on errors`);
       addChronicle({ ts: Date.now(), kind: 'alarm', agentId: after.id, text: 'keeps hitting errors' });
     }
-    if (after.status === 'waiting') addToast(`🙋 ${look.name} @ ${after.project} needs your review`, 'info');
+    if (after.status === 'waiting') addToast(`🙋 ${look.name} @ ${after.project} ${after.owner ? `is waiting on ${after.owner}` : 'needs your review'}`, 'info');
   }
   if (after.lastHumanTs > before.lastHumanTs) {
     addFloater(worker.x, worker.y - 26, '📋 new orders', '#6cc4ff');
@@ -169,6 +170,10 @@ export function addFloater(x, y, text, color) {
 // The server issues a new API token each time it starts, so after a restart the page reloads itself
 // to pick up the new one (keeps a long-running wallpaper working).
 export function connect() {
+  if (CLAN_ID) {
+    connectToClan();
+    return;
+  }
   const source = new EventSource('/events');
   let lostContact = false;
   source.onopen = () => {
@@ -178,6 +183,15 @@ export function connect() {
   source.onerror = () => {
     lostContact = true;
     document.getElementById('loadingHint').textContent = 'Lost contact with the colony server — retrying…';
+  };
+}
+
+function connectToClan() {
+  document.getElementById('loadingHint').textContent = 'Gathering the clan';
+  const source = new EventSource(`/api/clans/${encodeURIComponent(CLAN_ID)}/stream`);
+  source.onmessage = (e) => onSnapshot(clanSnapshot(JSON.parse(e.data)));
+  source.onerror = () => {
+    document.getElementById('loadingHint').textContent = 'Lost contact with the hub — retrying…';
   };
 }
 

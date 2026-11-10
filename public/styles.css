@@ -45,6 +45,7 @@ canvas#world.dragging { cursor: grabbing; }
 #statusBar {
   top: calc(var(--inset-top) + 10px); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap; font-size: 19px;
+  max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none;
 }
 #statusBar .seg { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-left: 1px solid rgba(255,255,255,.1); }
 #statusBar .seg:first-child { border-left: 0; }
@@ -265,3 +266,31 @@ body.wallpaper #statusBar { opacity: .9; }
   #chronicle { max-height: 150px; }
   #toolbar { left: 12px; right: 12px; bottom: 176px; flex-wrap: wrap; justify-content: center; }
 }
+
+/* Clans: the panel for linking this Mac and choosing what each clan sees. */
+#clans { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(600px, calc(100vw - 24px)); max-height: 80vh; overflow: auto; display: none; z-index: 6; }
+#clans.open { display: block; }
+#clans h2 { margin: 0 0 8px; font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--gold); }
+#clans .section { margin-top: 14px; }
+#clans .linked-as { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+#clans .linked-as b { color: var(--gold); font-weight: normal; }
+#clans .clan-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+#clans .clan-row .dim { margin-left: 6px; }
+#clans table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+#clans th { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--muted); text-align: center; padding: 4px 6px; font-weight: normal; }
+#clans th:first-child, #clans td:first-child { text-align: left; }
+#clans td { padding: 3px 6px; text-align: center; border-top: 1px solid rgba(255,255,255,.08); }
+#clans tr:hover td { background: rgba(255,255,255,.04); }
+#clans input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
+#clans .ok { color: var(--green); }
+#clans .warn { color: var(--red); }
+#btnClans.on { color: var(--gold); }
+#btnMembers, #clanSeg { display: none; }
+
+/* A clan's shared town on a hub: watch-only, so everything that spends, hires or talks to agents is hidden. */
+body.clan #btnMembers { display: block; }
+body.clan #clanSeg { display: inline-flex; }
+body.clan #clanSeg b { color: var(--gold); font-weight: normal; }
+body.clan #treasurySeg, body.clan #statusDetails, body.clan #btnRebuild, body.clan #btnCrew, body.clan #btnFame, body.clan #btnWard,
+body.clan #sheetExpand, body.clan #sheetStats, body.clan #sheetMoreToggle, body.clan #sheetMore, body.clan #ctxHire { display: none !important; }
+body.clan #statusBar { cursor: default; }

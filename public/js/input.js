@@ -2,6 +2,7 @@
 import { DAY_MS, FEATURES, LAYER_LABELS, TIERS, buildingHealth, problemLines, starsOf } from './buildings.js';
 import { screenToWorld } from './camera.js';
 import { canvas } from './canvas.js';
+import { CLAN_ID } from './config.js';
 import { statusLabel } from './hud.js';
 import { prettyModel } from './identity.js';
 import { YOU } from './layout.js';
@@ -106,7 +107,8 @@ function buildingTooltip(building) {
     if (profile.ui) features.unshift('Web UI');
     if (features.length) lines.push(muted(features.join(' · ')));
   }
-  lines.push(`${money(p.cost)} spent · ${compact(p.lines)} lines changed`);
+  if (CLAN_ID) lines.push(`Shared by ${p.members.join(', ')}`);
+  else lines.push(`${money(p.cost)} spent · ${compact(p.lines)} lines changed`);
   lines.push(`${p.active} at work · ${p.agents} today`);
   const health = buildingHealth(building);
   if (health.live.size) lines.push(`<span style="color:var(--gold)">Now editing ${[...health.live].map((l) => LAYER_LABELS[l]).join(', ')}</span>`);
@@ -116,7 +118,7 @@ function buildingTooltip(building) {
   }
   if (health.heavy) lines.push(`🏗 ${compact(p.linesToday)} lines changed today`);
   if (health.quiet) lines.push(`🌿 Quiet for ${Math.floor((Date.now() - p.lastTs) / DAY_MS)} days`);
-  lines.push(muted('Right-click to hire an agent'));
+  if (!CLAN_ID) lines.push(muted('Right-click to hire an agent'));
   return lines.join('<br>');
 }
 
@@ -131,9 +133,11 @@ function updateHover(sx, sy) {
   let html;
   if (hit.type === 'worker') {
     const a = hit.worker.agent;
-    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status)} · ${escapeHtml(a.project)}${siteOf(a) !== a.project ? ` → working on ${escapeHtml(siteOf(a))}` : ''}<br>${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
+    const where = `${escapeHtml(a.project)}${siteOf(a) !== a.project ? ` → working on ${escapeHtml(siteOf(a))}` : ''}`;
+    const detail = a.owner ? `${escapeHtml(a.owner)}'s agent${a.lastAction ? ` · ${escapeHtml(a.lastAction)}` : ''}` : `${money(a.cost)} spent · ${compact(a.linesAdded + a.linesRemoved)} bricks`;
+    html = `<b style="color:var(--gold)">${escapeHtml(hit.worker.look.name)}</b> · ${escapeHtml(prettyModel(a.model))}<br>${statusLabel(a.status, a.owner)} · ${where}<br>${detail}`;
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
-    if (a.status === 'waiting') html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
+    if (a.status === 'waiting' && !a.owner) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
   } else {
     html = buildingTooltip(hit.building);
   }
