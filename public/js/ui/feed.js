@@ -9,6 +9,8 @@ import { selectWorker } from './sheet.js';
 const FEED_KINDS = new Set(['update', 'waiting', 'broke', 'fixed']);
 const ICONS = { update: '💬', waiting: '🙋', broke: '⚠', fixed: '✓' };
 const WAITING_PREFIXES = ['is waiting for your review: ', 'needs you: '];
+const GENERIC_WAITING = 'is waiting for review';
+const SHARE_HINT = 'Members turn on "Share my agents\' updates" in their town\'s 🛡 panel to post here.';
 const COLLAPSED_ITEMS = 2;
 const EXPANDED_ITEMS = 50;
 const OPEN_KEY = 'agentColony.feedOpen';
@@ -37,9 +39,15 @@ function stillWaiting(event) {
   return Boolean(worker && worker.agent.status === 'waiting' && event.ts >= worker.agent.waitingSince - 1000);
 }
 
-function waitingText(event, owner) {
+// The question an agent asked, or '' when its owner doesn't share updates and only "waiting" reached the hub.
+function questionOf(event) {
   const prefix = WAITING_PREFIXES.find((p) => event.text.startsWith(p));
-  const question = prefix ? event.text.slice(prefix.length) : event.text === 'is waiting for review' ? '' : event.text;
+  if (prefix) return event.text.slice(prefix.length);
+  return event.text === GENERIC_WAITING ? '' : event.text;
+}
+
+function waitingText(event, owner) {
+  const question = questionOf(event);
   const whom = owner || 'you';
   const lead = stillWaiting(event) ? `waiting on ${whom}` : `asked ${whom}`;
   return `${lead}${question ? `: ${question}` : ''}`;
@@ -58,7 +66,13 @@ function itemHtml(event) {
     + `<div class="what">${ICONS[event.kind]} ${escapeHtml(text)}</div></li>`;
 }
 
+// An answered question with no text says nothing, so only open ones without text stay in the drawer.
+function informative(event) {
+  return event.kind !== 'waiting' || stillWaiting(event) || Boolean(questionOf(event));
+}
+
 function matches(event) {
+  if (!informative(event)) return false;
   if (filter === 'waiting') return event.kind === 'waiting' && stillWaiting(event);
   if (filter === 'mine') return ownerOf(event) === myLogin;
   return true;
@@ -67,11 +81,13 @@ function matches(event) {
 export function renderFeed() {
   if (!state.data) return;
   const open = feed.classList.contains('open');
-  const events = state.data.events.filter((e) => FEED_KINDS.has(e.kind)).filter(matches).sort((a, b) => b.ts - a.ts);
+  const feedEvents = state.data.events.filter((e) => FEED_KINDS.has(e.kind));
+  const events = feedEvents.filter(matches).sort((a, b) => b.ts - a.ts);
   const shown = events.slice(0, open ? EXPANDED_ITEMS : COLLAPSED_ITEMS);
+  const nobodyShares = CLAN_ID && !feedEvents.some((e) => e.kind === 'update');
+  const hint = nobodyShares ? `<li class="empty">${escapeHtml(SHARE_HINT)}</li>` : '';
   document.getElementById('feedCount').textContent = events.length ? `${events.length}` : '';
-  list.innerHTML = shown.map(itemHtml).join('')
-    || `<li class="empty">${CLAN_ID ? 'No updates yet. Members share them from their town\'s 🛡 panel.' : 'No updates yet today.'}</li>`;
+  list.innerHTML = shown.map(itemHtml).join('') + hint || '<li class="empty">No updates yet today.</li>';
 }
 
 document.getElementById('feedToggle').addEventListener('click', () => {
