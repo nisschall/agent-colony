@@ -3,7 +3,7 @@ const { agents, dailyCost, dailyLines, dayKey, events, projectPaths, statusOf, s
 const { DEFAULT_PROJECTS_FOLDER, HISTORY_DAYS, MIN } = require('./config');
 const { isReleased, portalStatus } = require('./portal');
 const { problemsOf } = require('./checks');
-const { LIVE_LAYER_MS, isAppInternal, profileOf, stackOf } = require('./projects');
+const { LIVE_LAYER_MS, isAppInternal, profileOf, projectKey, stackOf } = require('./projects');
 const { currentTownSeed } = require('./town');
 
 const BUILDING_PLOTS = 12;
@@ -13,6 +13,7 @@ const UPDATE_KINDS = new Set(['update', 'waiting', 'broke', 'fixed']);
 const IMPORTANCE_DAYS = 7;
 // One message from you counts like ten minutes of agent work: projects you are engaged with matter more.
 const MESSAGE_WEIGHT = 10;
+const MERGED_COUNTS = ['lines', 'linesToday', 'cost', 'agents', 'active', 'errors', 'weekScore'];
 
 function recentDayKeys(now) {
   return Array.from({ length: IMPORTANCE_DAYS }, (_, i) => dayKey(now - i * 24 * 60 * MIN));
@@ -65,6 +66,51 @@ function tallyWork(projects, agent, home, today, weekKeys, now) {
     const project = edit.project ? projectEntry(projects, edit.project) : home;
     if (now - edit.ts < LIVE_LAYER_MS && !project.layers.includes(layer)) project.layers.push(layer);
   }
+}
+
+// Folders cloned from the same repo (one per branch, say) are one building. It is named after the shortest
+// folder name, so the name stays put as you switch between them. Returns each merged folder's building name.
+function mergeClones(projects) {
+  const groups = new Map();
+  for (const project of projects.values()) {
+    if (!project.path) continue;
+    const key = projectKey(project.path);
+    if (!key.startsWith('git:')) continue;
+    const group = groups.get(key) || [];
+    group.push(project);
+    groups.set(key, group);
+  }
+  const renamed = new Map();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    group.sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name));
+    const [main, ...clones] = group;
+    main.folders = group.map((project) => project.name);
+    for (const clone of clones) {
+      for (const field of MERGED_COUNTS) main[field] += clone[field];
+      main.lastTs = Math.max(main.lastTs, clone.lastTs);
+      main.layers = [...new Set([...main.layers, ...clone.layers])];
+      main.waitingIds.push(...clone.waitingIds);
+      projects.delete(clone.name);
+      renamed.set(clone.name, main.name);
+    }
+  }
+  return renamed;
+}
+
+// Failing checks and tool errors from every folder of a building, the latest result for each check.
+function problemsAcross(names, now) {
+  const failing = new Map();
+  let errorsLastHour = 0;
+  for (const name of names) {
+    const problems = problemsOf(name, now);
+    errorsLastHour += problems.errorsLastHour;
+    for (const check of problems.failing) {
+      const known = failing.get(check.kind);
+      if (!known || known.ts < check.ts) failing.set(check.kind, check);
+    }
+  }
+  return { failing: [...failing.values()], errorsLastHour };
 }
 
 // Plots go first to projects with an agent working or waiting now, then to this week's busiest, then the most recent.
@@ -129,19 +175,29 @@ function snapshot(ready, only = null) {
       status, ...stress,
     });
   }
+  const renamed = mergeClones(projects);
+  const buildingOf = (name) => renamed.get(name) || name;
+  for (const agent of roster) {
+    agent.project = buildingOf(agent.project);
+    agent.workProject = buildingOf(agent.workProject);
+  }
+  // A clan share chosen by folder name still covers that folder's building.
+  const folders = (project) => project.folders || [project.name];
   const shown = only
-    ? [...projects.values()].filter((project) => only.includes(project.name))
+    ? [...projects.values()].filter((project) => folders(project).some((name) => only.includes(name)))
     : [...projects.values()].filter((project) => !isAppInternal(project.path)).sort(byImportance).slice(0, BUILDING_PLOTS);
   for (const project of shown) {
     project.stack = stackOf(project.path);
     project.profile = profileOf(project.path);
-    project.problems = problemsOf(project.name, now);
+    project.problems = problemsAcross(folders(project), now);
   }
   // The latest events of every kind, plus the day's updates even when many edits came after them.
   const allEvents = events.slice().sort((a, b) => a.ts - b.ts);
   const recent = allEvents.slice(-RECENT_EVENTS);
   const updates = allEvents.filter((e) => UPDATE_KINDS.has(e.kind)).slice(-UPDATE_EVENTS);
-  const sortedEvents = [...new Set([...updates, ...recent])].sort((a, b) => a.ts - b.ts);
+  const sortedEvents = [...new Set([...updates, ...recent])]
+    .sort((a, b) => a.ts - b.ts)
+    .map((event) => (renamed.has(event.project) ? { ...event, project: renamed.get(event.project) } : event));
   return {
     now, ready, agents: roster, projects: shown, events: sortedEvents,
     defaults: { projectsFolder: DEFAULT_PROJECTS_FOLDER },
@@ -155,4 +211,4 @@ function snapshot(ready, only = null) {
   };
 }
 
-module.exports = { snapshot };
+module.exports = { snapshot, mergeClones };

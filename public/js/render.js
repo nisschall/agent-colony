@@ -4,11 +4,11 @@ import { buildingHealth, drawBuilding, styleFor } from './buildings.js';
 import { worldToScreenMatrix } from './camera.js';
 import { GLOW, canvas, ctx, pill, rect, toScreen } from './canvas.js';
 import { CLAN_ID, TILE } from './config.js';
-import { DISTRICTS, LAYOUT, LOTS, OFFICE, REC, YOU } from './layout.js';
+import { CITY, LAYOUT, LOTS, OFFICE, REC, YOU } from './layout.js';
 import { drawFireflies, drawMist, lighting } from './lighting.js';
 import { HIRED_MARK, HIRED_VEST, drawInspector, drawWorker, isOutOfSight } from './people.js';
 import {
-  BENCHES, GRASS_PATTERN, LAMPS, TREES, drawBench, drawCentrepiece, drawDistrictFlag, drawEmptyLot, drawGardenLot, drawLamp, drawOffice, drawPuddles,
+  BENCHES, GRASS_PATTERN, LAMPS, TREES, drawBench, drawCentrepiece, drawEmptyLot, drawGardenLot, drawLamp, drawMemberSign, drawOffice, drawPuddles,
   drawRecCenter, drawRecOverlay, drawTownEdge, drawTownHall, drawTree, ground,
 } from './scenery.js';
 import { reviewQueue } from './simulation.js';
@@ -31,12 +31,12 @@ export function render() {
   drawTownEdge();
   drawCentrepiece();
   drawPuddles();
-  // Nobody can build on a clan's empty lots, so they are gardens instead of free plots.
+  // Nobody can build on a clan's empty lots, so the few left at the end of its last street are gardens.
   const usedLots = new Set([...state.buildings.values()].map((b) => b.lot));
   LOTS.forEach(([lx, ly], index) => {
     if (usedLots.has(index)) return;
-    if (CLAN_ID) drawGardenLot(lx * TILE, ly * TILE, LAYOUT.pads[index]);
-    else drawEmptyLot(lx * TILE, ly * TILE);
+    if (!CLAN_ID) drawEmptyLot(lx * TILE, ly * TILE);
+    else if (CITY.order.includes(index)) drawGardenLot(lx * TILE, ly * TILE, LAYOUT.pads[index]);
   });
 
   const drawables = [];
@@ -48,7 +48,7 @@ export function render() {
     if (isOutOfSight(worker)) continue;
     drawables.push({ y: worker.y, draw: () => drawWorker(worker) });
   }
-  for (const district of DISTRICTS) drawables.push({ y: district.square.y, draw: () => drawDistrictFlag(district) });
+  for (const sign of CITY.signs) drawables.push({ y: LOTS[sign.lot][1] * TILE + 20, draw: () => drawMemberSign(sign) });
   drawables.push({ y: OFFICE.y, draw: CLAN_ID ? drawTownHall : drawOffice });
   drawables.push({ y: REC.y0, draw: drawRecCenter });
   if (!CLAN_ID) drawables.push({ y: YOU.y, draw: drawInspector });
@@ -145,32 +145,27 @@ function waitingLabel(queue) {
   return `🙋 ${queue} WAITING · ${whose}`;
 }
 
-// Who shares a downtown repo: up to three logins, then how many more.
-function sharedBy(members) {
-  if (!members || members.length < 2) return '';
+// Whose building it is in a clan's town: its member, or up to three who share it.
+function whose(members) {
+  if (!members || !members.length) return '';
+  if (members.length === 1) return `👤 ${members[0]}`;
   const more = members.length > 3 ? ` +${members.length - 3}` : '';
   return `👥 ${members.slice(0, 3).join(', ')}${more}`;
 }
 
-// A member with more projects than one district holds gets a second, numbered one.
-function districtName(district, index) {
-  const name = district.owner ? `${district.owner.toUpperCase()}'S DISTRICT` : 'SHARED DISTRICT';
-  const earlier = DISTRICTS.slice(0, index).filter((other) => other.owner === district.owner).length;
-  return earlier ? `${name} ${earlier + 1}` : name;
-}
-
 function drawClanLabels(m) {
-  DISTRICTS.forEach((district, index) => {
-    const at = toScreen(m, district.square.x, district.square.y - 40);
-    pill(`🏘 ${districtName(district, index)}`, at.x, at.y, 18, '#ffcc33', 'rgba(27,20,40,.85)');
-  });
+  for (const sign of CITY.signs) {
+    const [lx, ly] = LOTS[sign.lot];
+    const at = toScreen(m, lx * TILE - LAYOUT.pads[sign.lot].w / 2 - 6, ly * TILE - 8);
+    pill(`🏘 ${sign.owner.toUpperCase()}`, at.x, at.y, 16, '#ffcc33', 'rgba(27,20,40,.85)');
+  }
   const members = state.data.clan.members;
   const online = members.filter((member) => member.online).length;
   const hall = toScreen(m, OFFICE.x, OFFICE.y - 66);
   pill(`🏛 TOWN HALL · ${online}/${members.length} online`, hall.x, hall.y, 15, '#f4e9c9', 'rgba(27,20,40,.85)');
 }
 
-// Zoomed out over a clan's districts, labels shrink to the name, then give way to the district signs.
+// Zoomed out over a clan's town, labels shrink to the name, then give way to the members' signs.
 const SHORT_LABEL_ZOOM = 0.8;
 const NO_LABEL_ZOOM = 0.3;
 
@@ -193,7 +188,7 @@ function drawLabels() {
       active ? `${active}⚒` : '',
       failing ? `⚠ ${failing} failing` : health.smoking ? `⚠ ${health.errors} errors` : '',
       health.waiting ? `🙋 ${health.waiting}` : '',
-      sharedBy(building.project.members),
+      whose(building.project.members),
     ];
     const text = short ? name : parts.filter(Boolean).join(' · ');
     const at = toScreen(m, building.x, building.labelY);

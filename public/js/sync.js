@@ -5,8 +5,8 @@ import { CLAN_ID, CODE_GLYPHS, FLOOR_H, FOUNTAIN, MAX_FLOORS, PARK, TILE, WALLPA
 import { addChronicle, addToast, ingestEvents, renderHud } from './hud.js';
 import { identity } from './identity.js';
 import { fitCamera } from './camera.js';
-import { DISTRICTS, DISTRICT_LOTS, DOWNTOWN_LOTS, LAYOUT_SEED, LOTS, MAX_DISTRICTS, YOU, districtLots } from './layout.js';
-import { growTown } from './scenery.js';
+import { CITY, DOWNTOWN_LOTS, LAYOUT_SEED, LOTS, YOU, cityGrown } from './layout.js';
+import { growCity } from './scenery.js';
 import { targetFor } from './simulation.js';
 import { state } from './state.js';
 import { BUSY_STATUSES } from './ui/boards.js';
@@ -34,29 +34,29 @@ function freeLot(projectName, allowed, used) {
   return lot;
 }
 
-// Puts a group of projects into districts of 10 lots, adding as many as the group needs.
-function fillDistricts(owner, projects, owners, placements) {
-  for (let start = 0; start < projects.length && owners.length < MAX_DISTRICTS; start += DISTRICT_LOTS) {
-    const allowed = districtLots(owners.length);
-    owners.push(owner);
-    for (const project of projects.slice(start, start + DISTRICT_LOTS)) placements.push({ project, allowed });
-  }
-}
-
-// In a clan's town, repos several members work on go downtown and each member's own projects go to their
-// district east of it. Your own town is downtown only.
+// In a clan's town every building takes the next lot in order: repos several members work on first, then each
+// member's own projects as one run, each group A to Z so a new project only moves the ones after it.
+// The town grows streets to fit. Your own town is downtown only.
 function placementsFor(projects) {
   if (!CLAN_ID) return projects.slice(0, DOWNTOWN_LOTS).map((project) => ({ project, allowed: DOWNTOWN }));
-  const shared = projects.filter((project) => project.members.length > 1);
-  const placements = shared.slice(0, DOWNTOWN_LOTS).map((project) => ({ project, allowed: DOWNTOWN }));
-  const owners = [];
-  fillDistricts('', shared.slice(DOWNTOWN_LOTS), owners, placements);
-  const logins = state.data.clan.members.map((member) => member.login);
-  for (const login of logins) {
-    const own = projects.filter((project) => project.members.length === 1 && project.members[0] === login);
-    fillDistricts(login, own, owners, placements);
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const runs = [{ owner: '', projects: projects.filter((project) => project.members.length > 1).sort(byName) }];
+  for (const { login } of state.data.clan.members) {
+    const own = projects.filter((project) => project.members.length === 1 && project.members[0] === login).sort(byName);
+    runs.push({ owner: login, projects: own });
   }
-  growTown(owners);
+  growCity(runs.reduce((sum, run) => sum + run.projects.length, 0));
+  const placements = [];
+  const signs = [];
+  let next = 0;
+  for (const run of runs) {
+    if (run.owner && run.projects.length && next < CITY.order.length) signs.push({ owner: run.owner, lot: CITY.order[next] });
+    for (const project of run.projects.slice(0, CITY.order.length - next)) {
+      placements.push({ project, allowed: [CITY.order[next]] });
+      next += 1;
+    }
+  }
+  CITY.signs = signs;
   return placements;
 }
 
@@ -122,8 +122,8 @@ function onSnapshot(data) {
   const first = !state.data;
   state.data = data;
   syncBuildings(data.projects);
-  // Districts only appear with the first snapshot, after the page fitted the camera to downtown.
-  if (first && DISTRICTS.length) fitCamera();
+  // A clan's town only grows with the first snapshot, after the page fitted the camera to downtown.
+  if (first && cityGrown()) fitCamera();
   const live = new Set();
   for (const agent of data.agents) {
     live.add(agent.id);

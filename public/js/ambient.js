@@ -34,7 +34,7 @@ const LANES = [
 ];
 export const DELIVERY_COOLDOWN_MS = 60_000;
 
-// A car that leaves the town comes back on any road, so a clan's grid of districts gets traffic too.
+// A car that leaves the town comes back on any road, so a clan's added streets get traffic too.
 function laneOnAnyRoad(dir) {
   const rows = roadRows();
   const row = rows[Math.floor(Math.random() * rows.length)];

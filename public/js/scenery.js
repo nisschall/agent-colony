@@ -1,10 +1,10 @@
 // The static world: ground, roads, park, centrepiece, town edge, trees, rec center, review office,
-// and in a clan's town the town hall and the districts east of downtown.
+// and in a clan's town the town hall, member signs and the streets added to fit.
 import { rainAmount, windFactor } from './ambient.js';
 import { OUTLINE, canvas, ctx, rect, shade } from './canvas.js';
 import { FOUNTAIN, MAP_W, PARK, TILE, WALLS } from './config.js';
 import {
-  DISTRICTS, FOOD_TRUCK, LAYOUT, LOTS, NAP_SLOTS, OFFICE, REC, emptyBlocks, roadColumns, roadRows, setDistricts, townHeight, townWidth,
+  CITY, FOOD_TRUCK, LAYOUT, LOTS, NAP_SLOTS, OFFICE, REC, buildCity, greenBelts, roadColumns, roadRows, townHeight, townWidth,
 } from './layout.js';
 import { daylight, drawSunShadow } from './lighting.js';
 import { reviewQueue } from './simulation.js';
@@ -12,8 +12,6 @@ import { state } from './state.js';
 import { hash, pick, seeded } from './utils.js';
 
 export const ground = document.createElement('canvas');
-const SQUARE_HALF_W = 9 * TILE;
-const SQUARE_HALF_H = 4 * TILE;
 
 // Avenues run from the first east-west road to the last one.
 function avenueSpan() {
@@ -46,7 +44,6 @@ export function paintGround() {
   paintSidewalks(g);
   paintRoads(g);
   paintPark(g);
-  paintDistrictSquares(g);
   paintLotPads(g);
   paintGroundDetails(g);
 }
@@ -137,32 +134,10 @@ function distanceToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-// Each district's square: a lawn ringed by a path, with a paved circle for its flag in the middle.
-function paintDistrictSquares(g) {
-  for (const { square } of DISTRICTS) {
-    const x0 = square.x - SQUARE_HALF_W;
-    const y0 = square.y - SQUARE_HALF_H;
-    g.fillStyle = '#69ab53';
-    g.fillRect(x0, y0, SQUARE_HALF_W * 2, SQUARE_HALF_H * 2);
-    g.fillStyle = '#d8c39a';
-    g.fillRect(x0 + 6, y0 + 6, SQUARE_HALF_W * 2 - 12, 5);
-    g.fillRect(x0 + 6, y0 + SQUARE_HALF_H * 2 - 11, SQUARE_HALF_W * 2 - 12, 5);
-    g.fillRect(x0 + 6, y0 + 6, 5, SQUARE_HALF_H * 2 - 12);
-    g.fillRect(x0 + SQUARE_HALF_W * 2 - 11, y0 + 6, 5, SQUARE_HALF_H * 2 - 12);
-    g.fillRect(x0 + 6, square.y - 2, SQUARE_HALF_W * 2 - 12, 5);
-    g.fillStyle = '#cbb588';
-    g.beginPath();
-    g.arc(square.x, square.y, 20, 0, Math.PI * 2);
-    g.fill();
-  }
-}
-
-function inDistrictSquare(x, y, margin) {
-  return DISTRICTS.some(({ square }) => Math.abs(x - square.x) < SQUARE_HALF_W + margin && Math.abs(y - square.y) < SQUARE_HALF_H + margin);
-}
-
+// A clan's town paints pads only on the lots it fills; your own town paints all of them.
 function paintLotPads(g) {
   LOTS.forEach(([lx, ly], index) => {
+    if (CITY.order.length && !CITY.order.includes(index)) return;
     const pad = LAYOUT.pads[index];
     const centerX = lx * TILE;
     g.fillStyle = '#7a6448';
@@ -182,7 +157,7 @@ export const TREES = [];
 export const BENCHES = [];
 export const LAMPS = [];
 
-// Trees scattered over part of a block (tile rows `top` to `top + span` of it), clear of roads and its square.
+// Trees scattered over part of a block (tile rows `top` to `top + span` of it), clear of its roads.
 function plantTrees(rand, block, count, top, span) {
   const columns = roadColumns();
   const rows = roadRows();
@@ -191,43 +166,41 @@ function plantTrees(rand, block, count, top, span) {
     const y = (block.y0 + top + rand() * span) * TILE;
     const onAvenue = columns.some((col) => x > col * TILE - 12 && x < (col + 2) * TILE + 12);
     const onRoad = rows.some((row) => y > row * TILE - 4 && y < (row + 2) * TILE + 16);
-    if (onAvenue || onRoad || inDistrictSquare(x, y, 12)) continue;
+    if (onAvenue || onRoad) continue;
     placed += 1;
-    TREES.push({ x, y, r: 9 + rand() * 5, hue: rand(), district: true });
+    TREES.push({ x, y, r: 9 + rand() * 5, hue: rand(), city: true });
   }
 }
 
-// Trees, benches and lamps for the districts, and a wood in any empty block, rebuilt whenever they change.
-function placeDistrictScenery() {
-  for (const list of [TREES, BENCHES, LAMPS]) {
-    const downtown = list.filter((item) => !item.district);
+// A wide clan town carries the park's trees east, between downtown's two roads, and lights its avenues.
+function placeCityScenery() {
+  for (const list of [TREES, LAMPS]) {
+    const downtown = list.filter((item) => !item.city);
     list.splice(0, list.length, ...downtown);
   }
-  for (const district of DISTRICTS) {
-    const rand = seeded(district.seed || 1);
-    const { square } = district;
-    plantTrees(rand, district, 14, 16, 17);
-    BENCHES.push({ x: square.x - 44, y: square.y + 16, district: true }, { x: square.x + 44, y: square.y + 16, district: true });
-    LAMPS.push({ x: square.x - 30, y: square.y - 22, district: true }, { x: square.x + 30, y: square.y - 22, district: true });
-  }
-  emptyBlocks().forEach((block, index) => plantTrees(seeded(900 + index), block, 45, 1, 44));
+  greenBelts().forEach((belt, index) => {
+    plantTrees(seeded(900 + index), belt, 22, 16, 15);
+    LAMPS.push({ x: (belt.x0 + 1) * TILE, y: 12.5 * TILE, city: true }, { x: (belt.x0 + 1) * TILE, y: 45.5 * TILE, city: true });
+  });
 }
 
-// Lays out a clan's districts and repaints the ground when they change.
-export function growTown(owners) {
-  if (!setDistricts(owners)) return;
+// Sizes a clan's town for its buildings and repaints the ground when that changes.
+export function growCity(count) {
+  if (!buildCity(count)) return;
   paintGround();
-  placeDistrictScenery();
+  placeCityScenery();
 }
 
-export function drawDistrictFlag(district) {
-  const { x, y } = district.square;
-  const color = pick(WALLS, district.seed);
-  rect(x - 1, y - 30, 2, 30, '#8f8a99');
-  rect(x - 2, y - 32, 4, 2, '#d9a441');
-  const wave = Math.round(Math.sin(state.time * 2 * windFactor() + district.seed) * 1.5);
-  for (let i = 0; i < 4; i++) rect(x + 1 + i * 4, y - 29 + (i % 2 ? wave : 0), 4, 9, i % 2 ? shade(color, -20) : color);
-  rect(x - 4, y - 2, 8, 3, '#7a7484');
+// A signpost where a member's run of buildings starts, in that member's colour.
+export function drawMemberSign(sign) {
+  const [lx, ly] = LOTS[sign.lot];
+  const x = lx * TILE - LAYOUT.pads[sign.lot].w / 2 - 6;
+  const y = ly * TILE + 20;
+  const color = pick(WALLS, hash(sign.owner));
+  rect(x - 1, y - 22, 2, 22, '#6b4a2b');
+  rect(x - 9, y - 26, 18, 8, color);
+  rect(x - 9, y - 26, 18, 1, shade(color, 30));
+  rect(x - 9, y - 19, 18, 1, shade(color, -40));
 }
 
 export function placeScenery() {
@@ -467,7 +440,7 @@ function isOpenGrass(x, y) {
   const onRoadColumn = roadColumns().some((col) => x > col * TILE - 4 && x < (col + 2) * TILE + 4) && y > span.top && y < span.bottom;
   const onLot = LOTS.some(([lx, ly]) => Math.abs(x - lx * TILE) < 64 && y > ly * TILE - 160 && y < ly * TILE + 28);
   const inPark = x > PARK.x0 - 4 && x < PARK.x1 + 4 && y > PARK.y0 - 4 && y < PARK.y1 + 4;
-  return !onRoadRow && !onRoadColumn && !onLot && !inPark && !inDistrictSquare(x, y, 4);
+  return !onRoadRow && !onRoadColumn && !onLot && !inPark;
 }
 
 function paintGroundDetails(g) {

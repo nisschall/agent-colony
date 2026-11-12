@@ -4,12 +4,12 @@
 // commands, file names, folder paths, chat titles or models. Agents' own
 // end-of-turn summaries and the questions they ask you are added only if you turn on "share updates".
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const { ApiError } = require('./api-error');
 const { CLAN_FILE, PORT } = require('./config');
 const { WAITING_PREFIX } = require('./agents');
+const { normalizeRemote, projectKey } = require('./projects');
 const { snapshot } = require('./snapshot');
 
 const PUSH_MS = 5000;
@@ -17,7 +17,6 @@ const STATUS_CACHE_MS = 30_000;
 const LINK_MS = 30 * 60 * 1000;
 const MAX_PENDING_LINKS = 10;
 const REQUEST_TIMEOUT_MS = 10_000;
-const REMOTE_CACHE_MS = 10 * 60 * 1000;
 const GENERIC_WAITING = 'is waiting for review';
 const NOT_LINKED = 'This Mac is not linked to a hub yet.';
 const PORTAL_WAITING_PREFIX = 'needs you: ';
@@ -27,7 +26,6 @@ let state = readState();
 const pendingLinks = new Map();
 let cachedStatus = null;
 let lastPush = { ok: false, at: 0, message: '' };
-const remotes = new Map();
 
 function readState() {
   try {
@@ -54,46 +52,6 @@ function hubOrigin(raw) {
   return url.origin;
 }
 
-// github.com/org/repo for any clone URL, without credentials, so the same repo matches across Macs.
-function normalizeRemote(remote) {
-  const value = String(remote || '').trim();
-  const scp = value.match(/^[^@/]+@([^:/]+):(.+)$/);
-  let hostAndPath;
-  if (scp) {
-    hostAndPath = `${scp[1]}/${scp[2]}`;
-  } else {
-    try {
-      const url = new URL(value);
-      hostAndPath = `${url.hostname}${url.pathname}`;
-    } catch {
-      return '';
-    }
-  }
-  return hostAndPath.replace(/\/+$/, '').replace(/\.git$/, '').toLowerCase();
-}
-
-function shortHash(value) {
-  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 20);
-}
-
-function originUrl(folder) {
-  try {
-    return execFileSync('git', ['-C', folder, 'config', '--get', 'remote.origin.url'], { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch {
-    return '';
-  }
-}
-
-// The hub sees a hash of the repo, not its address or the folder it is in.
-function projectKey(folder) {
-  const cached = remotes.get(folder);
-  if (cached && Date.now() - cached.at < REMOTE_CACHE_MS) return cached.key;
-  const remote = folder ? normalizeRemote(originUrl(folder)) : '';
-  const key = remote ? `git:${shortHash(remote)}` : `local:${shortHash(folder || 'unknown')}`;
-  remotes.set(folder, { key, at: Date.now() });
-  return key;
-}
-
 function waitingQuestion(text) {
   for (const prefix of [WAITING_PREFIX, PORTAL_WAITING_PREFIX]) {
     if (text.startsWith(prefix)) return text.slice(prefix.length);
@@ -115,7 +73,8 @@ function buildReport(snap, shares, keyOf, shareUpdates = false) {
   const projects = [];
   const keys = new Map();
   for (const project of snap.projects) {
-    const clans = shares[project.name] || [];
+    // A building made of several clones is shared if any of its folders is.
+    const clans = [...new Set((project.folders || [project.name]).flatMap((name) => shares[name] || []))];
     if (!clans.length) continue;
     const key = keyOf(project.path);
     keys.set(project.name, key);

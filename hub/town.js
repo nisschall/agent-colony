@@ -132,7 +132,8 @@ function createTown(store) {
         const key = shared.key.startsWith('git:') ? shared.key : `${user.login}/${shared.key}`;
         townKey.set(shared.key, key);
         const project = townProject(projects, key, shared.name);
-        project.members.push(user.login);
+        // A member can report one repo from several folders (say one per branch); they still count once.
+        if (!project.members.includes(user.login)) project.members.push(user.login);
         if (shared.profile && (!project.profile || shared.profile.complexity > project.profile.complexity)) project.profile = shared.profile;
         project.failing.push(...shared.failing.map((f) => ({ ...f, owner: user.login })));
         project.lastTs = Math.max(project.lastTs, shared.lastTs);

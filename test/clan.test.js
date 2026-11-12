@@ -9,9 +9,14 @@ test('clone URLs of the same repo normalize alike, without credentials', () => {
     'https://github.com/acme/shop',
     'https://user:ghp_secret@github.com/Acme/Shop.git',
     'ssh://git@github.com/acme/shop.git/',
+    'git@ssh.github.com:acme/shop.git',
+    'ssh://git@ssh.github.com:443/acme/shop.git',
   ];
   for (const url of same) assert.strictEqual(normalizeRemote(url), 'github.com/acme/shop');
   assert.strictEqual(normalizeRemote(''), '');
+  const bitbucket = ['git@ssh.bitbucket.org:cybernxt/app.git', 'ssh://git@altssh.bitbucket.org:443/cybernxt/app.git', 'https://me@bitbucket.org/cybernxt/app.git'];
+  for (const url of bitbucket) assert.strictEqual(normalizeRemote(url), 'bitbucket.org/cybernxt/app');
+  assert.strictEqual(normalizeRemote('git@ssh.example.com:a/b.git'), 'ssh.example.com/a/b');
 });
 
 test('the report holds only shared projects and leaves out tasks, models, tools, files, questions and errors', () => {
@@ -62,4 +67,15 @@ test('agents\' summaries and questions are shared only when the member turns on 
   const on = buildReport(snap, { shop: ['c1'] }, key, true);
   assert.deepStrictEqual([on.agents[0].summary.text, on.agents[0].ask], ['Drafted both options.', 'Which repository?']);
   assert.deepStrictEqual(on.events.map((e) => e.text), ['Drafted both options.', 'Which repository?', 'Build failing in shop']);
+});
+
+test('a building made of several clones is shared when any of its folders is', () => {
+  const now = Date.now();
+  const snap = {
+    projects: [{ name: 'audit-app', folders: ['audit-app', 'audit-app-before'], path: '/Users/me/audit-app', lastTs: now, profile: null, problems: { failing: [] } }],
+    agents: [],
+    events: [],
+  };
+  const report = buildReport(snap, { 'audit-app-before': ['c1'] }, () => 'git:aaaaaaaaaaaaaaaaaaaa');
+  assert.deepStrictEqual(report.projects.map((p) => [p.name, p.clans]), [['audit-app', ['c1']]]);
 });

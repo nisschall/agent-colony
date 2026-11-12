@@ -1,4 +1,6 @@
 // Project folders: names, stack, size and features, and which part of a project a file belongs to.
+const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -289,4 +291,53 @@ function setProject(agent, cwd) {
   agent.cwd = projectRoot(cwd);
 }
 
-module.exports = { stackOf, profileOf, LIVE_LAYER_MS, layerOf, setProject, isAppInternal, fileProjectRoot, projectName };
+// ---- which repo a folder is a clone of ----
+
+const REMOTE_CACHE_MS = 10 * 60 * 1000;
+const remotes = new Map();
+
+// github.com/org/repo for any clone URL, without credentials, so the same repo matches across Macs.
+function normalizeRemote(remote) {
+  const value = String(remote || '').trim();
+  const scp = value.match(/^[^@/]+@([^:/]+):(.+)$/);
+  let hostAndPath;
+  if (scp) {
+    hostAndPath = `${scp[1]}/${scp[2]}`;
+  } else {
+    try {
+      const url = new URL(value);
+      hostAndPath = `${url.hostname}${url.pathname}`;
+    } catch {
+      return '';
+    }
+  }
+  // GitHub and Bitbucket also take SSH on ssh.<host> and altssh.<host>, for the same repo.
+  const plainHost = hostAndPath.replace(/^(?:alt)?ssh\.(?=(?:github\.com|bitbucket\.org)\/)/i, '');
+  return plainHost.replace(/\/+$/, '').replace(/\.git$/, '').toLowerCase();
+}
+
+function shortHash(value) {
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 20);
+}
+
+function originUrl(folder) {
+  try {
+    return execFileSync('git', ['-C', folder, 'config', '--get', 'remote.origin.url'], { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return '';
+  }
+}
+
+// The hub sees a hash of the repo, not its address or the folder it is in.
+function projectKey(folder) {
+  const cached = remotes.get(folder);
+  if (cached && Date.now() - cached.at < REMOTE_CACHE_MS) return cached.key;
+  const remote = folder ? normalizeRemote(originUrl(folder)) : '';
+  const key = remote ? `git:${shortHash(remote)}` : `local:${shortHash(folder || 'unknown')}`;
+  remotes.set(folder, { key, at: Date.now() });
+  return key;
+}
+
+module.exports = {
+  stackOf, profileOf, LIVE_LAYER_MS, layerOf, setProject, isAppInternal, fileProjectRoot, projectName, normalizeRemote, projectKey,
+};

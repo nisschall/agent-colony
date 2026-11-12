@@ -1,4 +1,5 @@
 // Agent records and everything that updates them: tokens, edits, your messages, stress and status.
+const fs = require('fs');
 const path = require('path');
 const { MIN } = require('./config');
 const { fileProjectRoot, layerOf, projectName } = require('./projects');
@@ -80,10 +81,13 @@ function addCost(agent, ts, cost) {
 }
 
 // Edits to files in another project's folder count toward that project, not the one the session started in.
-// Files inside the session's own folder always stay with it, so sub-repos of a workspace don't split off.
+// Inside the session's own folder, files stay with it when it is a git repo (its submodules included); when it
+// is a plain folder holding several repos, each edit counts toward the repo the file is in.
 function creditedProject(agent, file) {
   const normalized = file.replace(/\/\.claude\/worktrees\/[^/]+/, '');
-  if (!agent.cwd || normalized.startsWith(agent.cwd + path.sep)) return '';
+  if (!agent.cwd) return '';
+  const inside = normalized.startsWith(agent.cwd + path.sep);
+  if (inside && fs.existsSync(path.join(agent.cwd, '.git'))) return '';
   const root = fileProjectRoot(normalized);
   if (!root || root === agent.cwd) return '';
   const name = projectName(root);

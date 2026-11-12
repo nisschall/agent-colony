@@ -145,7 +145,7 @@ function updateHover(sx, sy) {
     if (a.status === 'waiting' && a.waitingAsk) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
     if (a.summary) html += `<br><span style="color:var(--muted)">${icon('message')} ${escapeHtml(a.summary.text)}</span>`;
   } else if (hit.type === 'townHall') {
-    html = '<b style="color:var(--gold)">Town hall</b><br>Click to see the members and visit their districts';
+    html = '<b style="color:var(--gold)">Town hall</b><br>Click to see the members and visit their projects';
   } else {
     html = buildingTooltip(hit.building);
   }

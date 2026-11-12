@@ -81,95 +81,99 @@ function makeLayout(seed) {
   };
 }
 
-// A clan's town grows as a grid of blocks around downtown, keeping roughly the shape of a screen.
-// Each district is a block of 10 lots along its own two roads, with a small square in the middle.
-// Blocks east of downtown have an avenue on their west side; blocks south of it share downtown's avenues.
+// A clan's town is built to fit what is in it. Lots fill downtown's two rows, then streets added south of
+// downtown one row at a time; a big clan's rows also run east of downtown, so the town keeps roughly the shape
+// of a screen. Your own town is downtown only.
 export const DOWNTOWN_LOTS = BASE_LOTS.length;
-export const DISTRICT_LOTS = 10;
-export const DISTRICT_W = 56;
-export const MAX_DISTRICTS = 8;
-const BLOCK_H = MAP_H;
-// [column, row] of each district in turn; downtown is [0, 0].
-const GRID = [[1, 0], [0, 1], [1, 1], [2, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
+const DOWNTOWN_ROWS = [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]];
+const LOTS_PER_GROUP = 5;
+const GROUP_W = 56;
+const STREET_H = 16;
+const MAX_GROUPS = 3;
+const MAX_ROWS = 12;
+const TARGET_ASPECT = 1.6;
 const EAST_LOT_XS = [6, 17, 28, 39, 50];
 // Below downtown, lots sit clear of its two avenues (columns 15 and 50).
 const SOUTH_LOT_XS = [7, 25, 34, 43, 58];
-const BLOCK_LOT_ROWS = [11, 41];
-const BLOCK_ROAD_ROWS = [13, 43];
-export const DISTRICTS = [];
+// `groups` of 5 lots across, `rows` of lots down, the lot indices in the order they fill, and where each
+// member's run of buildings starts.
+export const CITY = { groups: 1, rows: 2, order: [], signs: [] };
 
-function columnX(column) {
-  return column === 0 ? 0 : MAP_W + (column - 1) * DISTRICT_W;
+// The tile row a row of lots stands on; its road runs just below.
+function lotRowY(row) {
+  return row === 0 ? 11 : 41 + (row - 1) * STREET_H;
 }
 
-function gridSize() {
-  const columns = Math.max(1, ...DISTRICTS.map((d) => d.column + 1));
-  const rows = Math.max(1, ...DISTRICTS.map((d) => d.row + 1));
-  return { columns, rows };
+function groupX(group) {
+  return group === 0 ? 0 : MAP_W + (group - 1) * GROUP_W;
+}
+
+export function cityGrown() {
+  return CITY.groups > 1 || CITY.rows > 2;
 }
 
 export function townWidth() {
-  return columnX(gridSize().columns) * TILE;
+  return groupX(CITY.groups) * TILE;
 }
 
 export function townHeight() {
-  return gridSize().rows * BLOCK_H * TILE;
+  return (MAP_H + (CITY.rows - 2) * STREET_H) * TILE;
 }
 
-// Every east-west road, in tile rows: two per row of blocks, running the full width of the town.
+// Every east-west road, in tile rows, each running the full width of the town.
 export function roadRows() {
-  const rows = [];
-  for (let row = 0; row < gridSize().rows; row++) rows.push(...BLOCK_ROAD_ROWS.map((r) => r + row * BLOCK_H));
-  return rows;
+  return Array.from({ length: CITY.rows }, (_, row) => lotRowY(row) + 2);
 }
 
-// Downtown's two avenues, plus one on the west side of each column of blocks east of it.
+// Downtown's two avenues, plus one on the west side of each group of lots east of it.
 export function roadColumns() {
-  const east = Array.from({ length: gridSize().columns - 1 }, (_, i) => columnX(i + 1));
+  const east = Array.from({ length: CITY.groups - 1 }, (_, i) => groupX(i + 1));
   return [...ROAD_COLUMNS, ...east];
 }
 
-// Grid cells inside the town that hold neither downtown nor a district.
-export function emptyBlocks() {
-  const { columns, rows } = gridSize();
-  const cells = [];
-  for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < columns; column++) {
-      const taken = (row === 0 && column === 0) || DISTRICTS.some((d) => d.column === column && d.row === row);
-      if (!taken) cells.push({ x0: columnX(column), y0: row * BLOCK_H, w: column === 0 ? MAP_W : DISTRICT_W });
-    }
+// The east part of downtown's band between its two roads, where a wide town plants trees.
+export function greenBelts() {
+  return Array.from({ length: CITY.groups - 1 }, (_, i) => ({ x0: groupX(i + 1), y0: 0, w: GROUP_W }));
+}
+
+// The fewest rows and groups that hold `count` lots while staying closest to a screen's shape.
+function citySize(count) {
+  let best = null;
+  for (let groups = 1; groups <= MAX_GROUPS; groups++) {
+    const rows = Math.min(MAX_ROWS, Math.max(2, Math.ceil(count / (groups * LOTS_PER_GROUP))));
+    const aspect = (MAP_W + (groups - 1) * GROUP_W) / (MAP_H + (rows - 2) * STREET_H);
+    const short = rows * groups * LOTS_PER_GROUP < count ? 10 : 0;
+    const score = Math.abs(Math.log(aspect / TARGET_ASPECT)) + short;
+    if (!best || score < best.score) best = { groups, rows, score };
   }
-  return cells;
+  return best;
 }
 
-export function districtLots(index) {
-  const first = DOWNTOWN_LOTS + index * DISTRICT_LOTS;
-  return Array.from({ length: DISTRICT_LOTS }, (_, k) => first + k);
-}
-
-// Lays out one district per owner ('' for shared repos that overflow downtown). Returns whether anything moved.
-export function setDistricts(owners) {
-  if (owners.join('\n') === DISTRICTS.map((d) => d.owner).join('\n')) return false;
-  DISTRICTS.length = 0;
+// Sizes a clan's town for `count` buildings and lists its lots in filling order. Returns whether it changed.
+export function buildCity(count) {
+  const { groups, rows } = citySize(count);
+  if (CITY.order.length && groups === CITY.groups && rows === CITY.rows) return false;
   LOTS.length = DOWNTOWN_LOTS;
   LAYOUT.pads.length = DOWNTOWN_LOTS;
   LAYOUT.driveways.length = DOWNTOWN_LOTS;
-  owners.slice(0, MAX_DISTRICTS).forEach((owner, index) => {
-    const [column, row] = GRID[index];
-    const x0 = columnX(column);
-    const y0 = row * BLOCK_H;
-    const w = column === 0 ? MAP_W : DISTRICT_W;
-    const seed = hash(`${owner}|${index}`);
-    DISTRICTS.push({ owner, column, row, x0, y0, w, seed, square: { x: (x0 + w / 2) * TILE, y: (y0 + 27) * TILE } });
-    const xs = column === 0 ? SOUTH_LOT_XS : EAST_LOT_XS;
-    for (const lotRow of BLOCK_LOT_ROWS) {
+  const order = [];
+  for (let row = 0; row < rows; row++) {
+    for (let group = 0; group < groups; group++) {
+      if (group === 0 && row < 2) {
+        order.push(...DOWNTOWN_ROWS[row]);
+        continue;
+      }
+      const seed = hash(`${row}|${group}`);
+      const xs = group === 0 ? SOUTH_LOT_XS : EAST_LOT_XS;
       xs.forEach((x, k) => {
-        LOTS.push([x0 + x, y0 + lotRow]);
+        order.push(LOTS.length);
+        LOTS.push([groupX(group) + x, lotRowY(row)]);
         LAYOUT.pads.push({ w: 104 + ((seed >>> k) % 20), h: 30 });
         LAYOUT.driveways.push(((seed >>> (k + 5)) & 1) === 1);
       });
     }
-  });
+  }
+  Object.assign(CITY, { groups, rows, order });
   return true;
 }
 

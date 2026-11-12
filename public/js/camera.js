@@ -1,7 +1,7 @@
 // The camera: canvas size, fitting the town on screen, and world/screen coordinates.
 import { canvas } from './canvas.js';
 import { MAP_H, MAP_W, PARAMS, TILE, WALLPAPER } from './config.js';
-import { DISTRICTS, townHeight, townWidth } from './layout.js';
+import { cityGrown, townHeight, townWidth } from './layout.js';
 import { liteMode, state } from './state.js';
 
 export function resize() {
@@ -14,22 +14,24 @@ export function resize() {
 const TOWN_BOX = { x0: 0, x1: MAP_W * TILE, y0: -50, y1: MAP_H * TILE };
 const STATUS_BAR_CLEARANCE = 58;
 const TOOLBAR_CLEARANCE = 64;
+// Leaves a little grass around a clan's grown town, so the outermost buildings aren't cut by the window edge.
+const GROWN_MARGIN = 0.94;
 
 export function inset(side) {
   return Number(PARAMS.get(side)) || 0;
 }
 
 // The whole town on one screen. Downtown alone can crop a little grass at the edges; a clan's grid of
-// districts is shown in full, with room for the status bar and toolbar.
+// town is shown in full, with room for the status bar and toolbar.
 export function fitCamera() {
   if (!WALLPAPER) {
     const width = townWidth();
     const height = townHeight();
-    const districts = DISTRICTS.length > 0;
+    const grown = cityGrown();
     state.camera.x = width / 2;
     state.camera.y = height / 2 - 20;
-    const fit = districts
-      ? Math.min(innerWidth / width, (innerHeight - STATUS_BAR_CLEARANCE - TOOLBAR_CLEARANCE) / height)
+    const fit = grown
+      ? Math.min(innerWidth / width, (innerHeight - STATUS_BAR_CLEARANCE - TOOLBAR_CLEARANCE) / height) * GROWN_MARGIN
       : Math.min(innerWidth / width, innerHeight / height) * 1.15;
     state.camera.zoom = Math.max(minZoom(), Math.min(3, fit));
     return;
@@ -48,9 +50,9 @@ export function fitCamera() {
   state.camera.y = centerY - (top + availableHeight / 2 - innerHeight / 2) / zoom;
 }
 
-// A clan's town can grow wider than the screen, so it lets you zoom out far enough to see its districts.
+// A clan's town can grow bigger than the screen, so it lets you zoom out far enough to see all of it.
 export function minZoom() {
-  return DISTRICTS.length ? 0.2 : 0.6;
+  return cityGrown() ? 0.2 : 0.6;
 }
 
 export function worldToScreenMatrix() {

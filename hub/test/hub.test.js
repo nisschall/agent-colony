@@ -117,6 +117,7 @@ test('a clan sees everyone\'s shared projects, merged by repo, with who is waiti
   await call(aliceMac, 'POST', '/api/report', report(clan.id, [
     { key: SHARED_REPO, name: 'shop', profile, problems: { failing: [{ kind: 'build', ts: Date.now() }], errorsLastHour: 2 } },
     { key: ALICE_ONLY, name: 'notes' },
+    { key: SHARED_REPO, name: 'shop-v2' },
   ], [
     { id: 'claude:a1', project: SHARED_REPO, status: 'waiting', waitingSince: 1000, title: 'Fix cart' },
     { id: 'claude:a2', project: ALICE_ONLY, status: 'working' },

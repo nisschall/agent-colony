@@ -1,9 +1,10 @@
 // Boards and the toolbar: Hall of Fame, Ward, Today's Crew, pause, speed, time and rebuild.
 import { fitCamera } from '../camera.js';
 import { canvas } from '../canvas.js';
+import { TILE } from '../config.js';
 import { addToast, autonomy, statusLabel } from '../hud.js';
 import { efficiency, identity, levelOf, prettyModel, xpOf } from '../identity.js';
-import { DISTRICTS, LAYOUT_SEED, YOU } from '../layout.js';
+import { CITY, LAYOUT_SEED, LOTS, YOU } from '../layout.js';
 import { TIME_PRESETS } from '../lighting.js';
 import { HIRED_MARK, HIRED_VEST, drawPerson } from '../people.js';
 import { state } from '../state.js';
@@ -50,7 +51,7 @@ export function renderBoard(mode) {
 }
 
 // A clan's members: who is online, how many agents they have here, and how many are waiting on them.
-// A member with a district can be clicked to visit it.
+// A member with buildings in the town can be clicked to visit them.
 function renderMembers(board) {
   const clan = state.data && state.data.clan;
   document.getElementById('boardTitle').innerHTML = `${icon('users')} ${escapeHtml(clan ? clan.name.toUpperCase() : 'CLAN')} — MEMBERS`;
@@ -60,9 +61,9 @@ function renderMembers(board) {
     const waiting = m.waiting ? `<span style="color:var(--gold)">${m.waiting}</span>` : '<span style="color:var(--muted)">0</span>';
     const name = m.name && m.name !== m.login ? ` <span style="color:var(--muted)">${escapeHtml(m.name)}</span>` : '';
     const avatar = m.avatarUrl ? `<img class="avatar" src="${escapeHtml(m.avatarUrl)}" alt="">` : '';
-    const hasDistrict = DISTRICTS.some((district) => district.owner === m.login);
-    const visit = hasDistrict ? `<span class="visit">${icon('home')} VISIT</span>` : '';
-    const attrs = hasDistrict ? ` class="row" data-login="${escapeHtml(m.login)}" title="Visit ${escapeHtml(m.login)}'s district"` : '';
+    const hasBuildings = CITY.signs.some((sign) => sign.owner === m.login);
+    const visit = hasBuildings ? `<span class="visit">${icon('home')} VISIT</span>` : '';
+    const attrs = hasBuildings ? ` class="row" data-login="${escapeHtml(m.login)}" title="Visit ${escapeHtml(m.login)}'s projects"` : '';
     return `<tr${attrs}><td>${avatar}${escapeHtml(m.login)}${name}</td><td>${m.role === 'leader' ? 'Leader' : 'Member'}</td><td>${seen}</td>`
       + `<td class="num">${m.agents}</td><td class="num">${waiting}</td><td>${visit}</td></tr>`;
   });
@@ -71,13 +72,15 @@ function renderMembers(board) {
     : '<p>No members yet.</p>';
 }
 
-function visitDistrict(login) {
-  const district = DISTRICTS.find((d) => d.owner === login);
-  if (!district) return;
+// Centres the view on where a member's run of buildings starts.
+function visitMember(login) {
+  const sign = CITY.signs.find((s) => s.owner === login);
+  if (!sign) return;
+  const [lx, ly] = LOTS[sign.lot];
   state.following = false;
-  state.camera.x = district.square.x;
-  state.camera.y = district.square.y - 40;
-  state.camera.zoom = 1;
+  state.camera.x = lx * TILE + 120;
+  state.camera.y = ly * TILE - 40;
+  state.camera.zoom = 1.2;
 }
 
 export function openMembers() {
@@ -257,7 +260,7 @@ document.getElementById('boardBody').addEventListener('click', (e) => {
   const member = e.target.closest('tr[data-login]');
   if (member) {
     toggleBoard(state.boardMode);
-    visitDistrict(member.dataset.login);
+    visitMember(member.dataset.login);
     return;
   }
   const row = e.target.closest('tr[data-id]');
