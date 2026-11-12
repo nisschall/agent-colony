@@ -2,7 +2,7 @@
 import { DELIVERY_COOLDOWN_MS, VEHICLE_COLORS, VISITOR_LOOKS, dayMood, foodTruckOpen, isDaytime } from './ambient.js';
 import { ctx, rect } from './canvas.js';
 import { FOUNTAIN, MAP_W, PARK, TILE } from './config.js';
-import { FOOD_TRUCK, townWidth } from './layout.js';
+import { FOOD_TRUCK, roadRows, townWidth } from './layout.js';
 import { daylight } from './lighting.js';
 import { drawOutlinedPerson } from './people.js';
 import { directionOf } from './simulation.js';
@@ -18,7 +18,8 @@ export function sendDeliveryVan(building) {
   const now = Date.now();
   if (!building || now - (state.lastDeliveryAt || 0) < DELIVERY_COOLDOWN_MS) return;
   if (state.visitors.some((v) => v.kind === 'van')) return;
-  const row = building.y < 20 * TILE ? 13 : building.y > 35 * TILE ? 43 : 0;
+  // The road just below the building's lot; side lots in the middle of downtown have none close by.
+  const row = roadRows().find((r) => r * TILE >= building.y && r * TILE - building.y < 3 * TILE);
   if (!row) return;
   state.lastDeliveryAt = now;
   const lane = { y: row * TILE + 11, dir: -1 };

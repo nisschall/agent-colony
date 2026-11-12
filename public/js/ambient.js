@@ -1,8 +1,8 @@
 // The colony's day: weather, traffic, clouds, birds and the error storm.
 import { canvas, ctx, rect, shade } from './canvas.js';
-import { MAP_H, TILE } from './config.js';
+import { TILE } from './config.js';
 import { addToast } from './hud.js';
-import { townWidth } from './layout.js';
+import { roadRows, townHeight, townWidth } from './layout.js';
 import { currentHour, daylight } from './lighting.js';
 import { state } from './state.js';
 import { hash, seeded, weightedPick } from './utils.js';
@@ -33,6 +33,13 @@ const LANES = [
   { y: 43 * TILE + 11, dir: -1 },
 ];
 export const DELIVERY_COOLDOWN_MS = 60_000;
+
+// A car that leaves the town comes back on any road, so a clan's grid of districts gets traffic too.
+function laneOnAnyRoad(dir) {
+  const rows = roadRows();
+  const row = rows[Math.floor(Math.random() * rows.length)];
+  return row * TILE + (dir > 0 ? 26 : 11);
+}
 export const IDLE_WANDER_CHANCE = 0.35;
 export const PARK_ACTIVITIES = ['coffee', 'phone', 'stretch', 'look'];
 export const VISITOR_LOOKS = [
@@ -73,7 +80,7 @@ function applyMood(mood) {
   }
   CLOUDS.length = 0;
   for (let i = 0; i < mood.weather.clouds; i++) {
-    CLOUDS.push({ x: rand() * worldWidth, y: 60 + rand() * (MAP_H * TILE - 120), r: 90 + rand() * 70, speed: (5 + rand() * 4) * mood.weather.cloudSpeed });
+    CLOUDS.push({ x: rand() * worldWidth, y: 60 + rand() * (townHeight() - 120), r: 90 + rand() * 70, speed: (5 + rand() * 4) * mood.weather.cloudSpeed });
   }
 }
 
@@ -129,8 +136,10 @@ export function updateAmbient(dt) {
   updateVisitors(dt);
   for (const car of CARS) {
     car.x += car.dir * car.speed * dt;
+    const wrapped = car.x > worldWidth + 30 || car.x < -30;
     if (car.x > worldWidth + 30) car.x = -30;
     if (car.x < -30) car.x = worldWidth + 30;
+    if (wrapped) car.y = laneOnAnyRoad(car.dir);
   }
   for (const cloud of CLOUDS) {
     cloud.x += cloud.speed * dt;
@@ -139,7 +148,7 @@ export function updateAmbient(dt) {
   state.birds = (state.birds || []).filter((bird) => bird.x < worldWidth + 40);
   for (const bird of state.birds) bird.x += bird.vx * dt;
   if (!state.birds.length && daylight() < 0.5 && Math.random() < dt / 20) {
-    const y = 40 + Math.random() * (MAP_H * TILE - 160);
+    const y = 40 + Math.random() * (townHeight() - 160);
     const size = 3 + Math.floor(Math.random() * 3);
     state.birds = Array.from({ length: size }, (_, i) => ({ x: -20 - i * 9, y: y + (i % 2) * 7 - i * 2, vx: 55, phase: i }));
   }

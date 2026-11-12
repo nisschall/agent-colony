@@ -1,7 +1,7 @@
 // Moving agents: where each one should be, walking there, and you following your focus.
 import { IDLE_WANDER_CHANCE, PARK_ACTIVITIES, foodTruckOpen, updateAmbient } from './ambient.js';
-import { CLAN_ID, CODE_GLYPHS, FOUNTAIN, PARK, ROAD_ROWS, TILE, WALK_SPEED } from './config.js';
-import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU, townWidth } from './layout.js';
+import { CLAN_ID, CODE_GLYPHS, FOUNTAIN, PARK, TILE, WALK_SPEED } from './config.js';
+import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU, roadRows, townWidth } from './layout.js';
 import { BENCHES } from './scenery.js';
 import { state } from './state.js';
 import { addFloater } from './sync.js';
@@ -107,7 +107,7 @@ export function sendAway(agentId) {
 }
 
 function nearestRoadY(y) {
-  const roads = ROAD_ROWS.map((row) => row * TILE + TILE / 2);
+  const roads = roadRows().map((row) => row * TILE + TILE / 2);
   return roads.reduce((best, road) => (Math.abs(road - y) < Math.abs(best - y) ? road : best));
 }
 

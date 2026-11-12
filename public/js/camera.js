@@ -1,7 +1,7 @@
 // The camera: canvas size, fitting the town on screen, and world/screen coordinates.
 import { canvas } from './canvas.js';
 import { MAP_H, MAP_W, PARAMS, TILE, WALLPAPER } from './config.js';
-import { DISTRICTS, DISTRICT_W } from './layout.js';
+import { DISTRICTS, townHeight, townWidth } from './layout.js';
 import { liteMode, state } from './state.js';
 
 export function resize() {
@@ -19,15 +19,18 @@ export function inset(side) {
   return Number(PARAMS.get(side)) || 0;
 }
 
-// A clan's town with districts opens on downtown and the first district, so you can see it carries on east.
+// The whole town on one screen. Downtown alone can crop a little grass at the edges; a clan's grid of
+// districts is shown in full, with room for the status bar and toolbar.
 export function fitCamera() {
   if (!WALLPAPER) {
-    const width = (MAP_W + (DISTRICTS.length ? DISTRICT_W : 0)) * TILE;
+    const width = townWidth();
+    const height = townHeight();
+    const districts = DISTRICTS.length > 0;
     state.camera.x = width / 2;
-    state.camera.y = MAP_H * TILE / 2 - 20;
-    // Downtown alone can crop a little grass at the edges; with a district beside it, show it all.
-    const overfit = DISTRICTS.length ? 1 : 1.15;
-    const fit = Math.min(innerWidth / width, innerHeight / (MAP_H * TILE)) * overfit;
+    state.camera.y = height / 2 - 20;
+    const fit = districts
+      ? Math.min(innerWidth / width, (innerHeight - STATUS_BAR_CLEARANCE - TOOLBAR_CLEARANCE) / height)
+      : Math.min(innerWidth / width, innerHeight / height) * 1.15;
     state.camera.zoom = Math.max(minZoom(), Math.min(3, fit));
     return;
   }

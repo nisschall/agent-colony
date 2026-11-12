@@ -1,5 +1,5 @@
 // The town layout, generated from the seed the server keeps.
-import { BASE_LOTS, CENTREPIECES, FOUNTAIN, LOT_ROWS, MAP_W, MIN_LOT_GAP_TILES, PARK, PARK_DESIGNS, ROAD_COLUMNS, ROAD_ROWS, TILE, TOWN_EDGES } from './config.js';
+import { BASE_LOTS, CENTREPIECES, FOUNTAIN, LOT_ROWS, MAP_H, MAP_W, MIN_LOT_GAP_TILES, PARK, PARK_DESIGNS, ROAD_COLUMNS, ROAD_ROWS, TILE, TOWN_EDGES } from './config.js';
 import { hash, seeded, weightedPick } from './utils.js';
 
 // The town's layout comes from a seed the server keeps, so every screen shows the same town until you rebuild it.
@@ -81,18 +81,65 @@ function makeLayout(seed) {
   };
 }
 
-// A clan's town grows east of downtown: each district is a block of 10 lots along the two main roads,
-// with an avenue on its west side and a small square in the middle.
+// A clan's town grows as a grid of blocks around downtown, keeping roughly the shape of a screen.
+// Each district is a block of 10 lots along its own two roads, with a small square in the middle.
+// Blocks east of downtown have an avenue on their west side; blocks south of it share downtown's avenues.
 export const DOWNTOWN_LOTS = BASE_LOTS.length;
 export const DISTRICT_LOTS = 10;
 export const DISTRICT_W = 56;
 export const MAX_DISTRICTS = 8;
-const DISTRICT_LOT_XS = [6, 17, 28, 39, 50];
-const DISTRICT_LOT_ROWS = [11, 41];
+const BLOCK_H = MAP_H;
+// [column, row] of each district in turn; downtown is [0, 0].
+const GRID = [[1, 0], [0, 1], [1, 1], [2, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
+const EAST_LOT_XS = [6, 17, 28, 39, 50];
+// Below downtown, lots sit clear of its two avenues (columns 15 and 50).
+const SOUTH_LOT_XS = [7, 25, 34, 43, 58];
+const BLOCK_LOT_ROWS = [11, 41];
+const BLOCK_ROAD_ROWS = [13, 43];
 export const DISTRICTS = [];
 
+function columnX(column) {
+  return column === 0 ? 0 : MAP_W + (column - 1) * DISTRICT_W;
+}
+
+function gridSize() {
+  const columns = Math.max(1, ...DISTRICTS.map((d) => d.column + 1));
+  const rows = Math.max(1, ...DISTRICTS.map((d) => d.row + 1));
+  return { columns, rows };
+}
+
 export function townWidth() {
-  return (MAP_W + DISTRICTS.length * DISTRICT_W) * TILE;
+  return columnX(gridSize().columns) * TILE;
+}
+
+export function townHeight() {
+  return gridSize().rows * BLOCK_H * TILE;
+}
+
+// Every east-west road, in tile rows: two per row of blocks, running the full width of the town.
+export function roadRows() {
+  const rows = [];
+  for (let row = 0; row < gridSize().rows; row++) rows.push(...BLOCK_ROAD_ROWS.map((r) => r + row * BLOCK_H));
+  return rows;
+}
+
+// Downtown's two avenues, plus one on the west side of each column of blocks east of it.
+export function roadColumns() {
+  const east = Array.from({ length: gridSize().columns - 1 }, (_, i) => columnX(i + 1));
+  return [...ROAD_COLUMNS, ...east];
+}
+
+// Grid cells inside the town that hold neither downtown nor a district.
+export function emptyBlocks() {
+  const { columns, rows } = gridSize();
+  const cells = [];
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const taken = (row === 0 && column === 0) || DISTRICTS.some((d) => d.column === column && d.row === row);
+      if (!taken) cells.push({ x0: columnX(column), y0: row * BLOCK_H, w: column === 0 ? MAP_W : DISTRICT_W });
+    }
+  }
+  return cells;
 }
 
 export function districtLots(index) {
@@ -107,13 +154,17 @@ export function setDistricts(owners) {
   LOTS.length = DOWNTOWN_LOTS;
   LAYOUT.pads.length = DOWNTOWN_LOTS;
   LAYOUT.driveways.length = DOWNTOWN_LOTS;
-  owners.forEach((owner, index) => {
-    const x0 = MAP_W + index * DISTRICT_W;
+  owners.slice(0, MAX_DISTRICTS).forEach((owner, index) => {
+    const [column, row] = GRID[index];
+    const x0 = columnX(column);
+    const y0 = row * BLOCK_H;
+    const w = column === 0 ? MAP_W : DISTRICT_W;
     const seed = hash(`${owner}|${index}`);
-    DISTRICTS.push({ owner, x0, seed, square: { x: (x0 + DISTRICT_W / 2) * TILE, y: 27 * TILE } });
-    for (const row of DISTRICT_LOT_ROWS) {
-      DISTRICT_LOT_XS.forEach((x, k) => {
-        LOTS.push([x0 + x, row]);
+    DISTRICTS.push({ owner, column, row, x0, y0, w, seed, square: { x: (x0 + w / 2) * TILE, y: (y0 + 27) * TILE } });
+    const xs = column === 0 ? SOUTH_LOT_XS : EAST_LOT_XS;
+    for (const lotRow of BLOCK_LOT_ROWS) {
+      xs.forEach((x, k) => {
+        LOTS.push([x0 + x, y0 + lotRow]);
         LAYOUT.pads.push({ w: 104 + ((seed >>> k) % 20), h: 30 });
         LAYOUT.driveways.push(((seed >>> (k + 5)) & 1) === 1);
       });

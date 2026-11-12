@@ -172,7 +172,7 @@ function drawClanLabels(m) {
 
 // Zoomed out over a clan's districts, labels shrink to the name, then give way to the district signs.
 const SHORT_LABEL_ZOOM = 0.8;
-const NO_LABEL_ZOOM = 0.35;
+const NO_LABEL_ZOOM = 0.3;
 
 function drawLabels() {
   const m = worldToScreenMatrix();
