@@ -3,11 +3,14 @@ import { CARS, drawBirds, drawCar, drawClouds, drawWeather } from './ambient.js'
 import { buildingHealth, drawBuilding, styleFor } from './buildings.js';
 import { worldToScreenMatrix } from './camera.js';
 import { GLOW, canvas, ctx, pill, rect, toScreen } from './canvas.js';
-import { TILE } from './config.js';
-import { LOTS, OFFICE, REC, YOU } from './layout.js';
+import { CLAN_ID, TILE } from './config.js';
+import { DISTRICTS, LAYOUT, LOTS, OFFICE, REC, YOU } from './layout.js';
 import { drawFireflies, drawMist, lighting } from './lighting.js';
 import { HIRED_MARK, HIRED_VEST, drawInspector, drawWorker, isOutOfSight } from './people.js';
-import { BENCHES, GRASS_PATTERN, LAMPS, TREES, drawBench, drawCentrepiece, drawEmptyLot, drawLamp, drawOffice, drawPuddles, drawRecCenter, drawRecOverlay, drawTownEdge, drawTree, ground } from './scenery.js';
+import {
+  BENCHES, GRASS_PATTERN, LAMPS, TREES, drawBench, drawCentrepiece, drawDistrictFlag, drawEmptyLot, drawGardenLot, drawLamp, drawOffice, drawPuddles,
+  drawRecCenter, drawRecOverlay, drawTownEdge, drawTownHall, drawTree, ground,
+} from './scenery.js';
 import { reviewQueue } from './simulation.js';
 import { state } from './state.js';
 import { drawBalloons, visitorDrawables } from './visitors.js';
@@ -28,9 +31,12 @@ export function render() {
   drawTownEdge();
   drawCentrepiece();
   drawPuddles();
+  // Nobody can build on a clan's empty lots, so they are gardens instead of free plots.
   const usedLots = new Set([...state.buildings.values()].map((b) => b.lot));
   LOTS.forEach(([lx, ly], index) => {
-    if (!usedLots.has(index)) drawEmptyLot(lx * TILE, ly * TILE);
+    if (usedLots.has(index)) return;
+    if (CLAN_ID) drawGardenLot(lx * TILE, ly * TILE, LAYOUT.pads[index]);
+    else drawEmptyLot(lx * TILE, ly * TILE);
   });
 
   const drawables = [];
@@ -42,9 +48,10 @@ export function render() {
     if (isOutOfSight(worker)) continue;
     drawables.push({ y: worker.y, draw: () => drawWorker(worker) });
   }
-  drawables.push({ y: OFFICE.y, draw: drawOffice });
+  for (const district of DISTRICTS) drawables.push({ y: district.square.y, draw: () => drawDistrictFlag(district) });
+  drawables.push({ y: OFFICE.y, draw: CLAN_ID ? drawTownHall : drawOffice });
   drawables.push({ y: REC.y0, draw: drawRecCenter });
-  drawables.push({ y: YOU.y, draw: drawInspector });
+  if (!CLAN_ID) drawables.push({ y: YOU.y, draw: drawInspector });
   for (const car of CARS) drawables.push({ y: car.y, draw: () => drawCar(car) });
   drawables.push(...visitorDrawables());
   drawables.sort((a, b) => a.y - b.y);
@@ -138,13 +145,44 @@ function waitingLabel(queue) {
   return `🙋 ${queue} WAITING · ${whose}`;
 }
 
+// Who shares a downtown repo: up to three logins, then how many more.
+function sharedBy(members) {
+  if (!members || members.length < 2) return '';
+  const more = members.length > 3 ? ` +${members.length - 3}` : '';
+  return `👥 ${members.slice(0, 3).join(', ')}${more}`;
+}
+
+// A member with more projects than one district holds gets a second, numbered one.
+function districtName(district, index) {
+  const name = district.owner ? `${district.owner.toUpperCase()}'S DISTRICT` : 'SHARED DISTRICT';
+  const earlier = DISTRICTS.slice(0, index).filter((other) => other.owner === district.owner).length;
+  return earlier ? `${name} ${earlier + 1}` : name;
+}
+
+function drawClanLabels(m) {
+  DISTRICTS.forEach((district, index) => {
+    const at = toScreen(m, district.square.x, district.square.y - 40);
+    pill(`🏘 ${districtName(district, index)}`, at.x, at.y, 18, '#ffcc33', 'rgba(27,20,40,.85)');
+  });
+  const members = state.data.clan.members;
+  const online = members.filter((member) => member.online).length;
+  const hall = toScreen(m, OFFICE.x, OFFICE.y - 66);
+  pill(`🏛 TOWN HALL · ${online}/${members.length} online`, hall.x, hall.y, 15, '#f4e9c9', 'rgba(27,20,40,.85)');
+}
+
+// Zoomed out over a clan's districts, labels shrink to the name, then give way to the district signs.
+const SHORT_LABEL_ZOOM = 0.8;
+const NO_LABEL_ZOOM = 0.35;
+
 function drawLabels() {
   const m = worldToScreenMatrix();
   const zoom = state.camera.zoom;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   const pulse = Math.floor(state.time * 2) % 2 === 0;
-  for (const building of state.buildings.values()) {
+  const short = CLAN_ID && zoom < SHORT_LABEL_ZOOM;
+  const buildings = CLAN_ID && zoom < NO_LABEL_ZOOM ? [] : [...state.buildings.values()];
+  for (const building of buildings) {
     const { emblem } = styleFor(building);
     const health = buildingHealth(building);
     const active = building.project.active;
@@ -155,20 +193,22 @@ function drawLabels() {
       active ? `${active}⚒` : '',
       failing ? `⚠ ${failing} failing` : health.smoking ? `⚠ ${health.errors} errors` : '',
       health.waiting ? `🙋 ${health.waiting}` : '',
-      building.project.members?.length > 1 ? `👥 ${building.project.members.length}` : '',
+      sharedBy(building.project.members),
     ];
-    const text = parts.filter(Boolean).join(' · ');
+    const text = short ? name : parts.filter(Boolean).join(' · ');
     const at = toScreen(m, building.x, building.labelY);
     const color = failing || health.smoking ? '#ff8a8a' : active ? '#ffcc33' : '#f4e9c9';
-    if (health.waiting && pulse) pill(text, at.x, at.y, 15, '#1b1428', '#ffcc33');
-    else pill(text, at.x, at.y, 15, color, 'rgba(27,20,40,.8)');
+    const size = short ? 13 : 15;
+    if (health.waiting && pulse) pill(text, at.x, at.y, size, '#1b1428', '#ffcc33');
+    else pill(text, at.x, at.y, size, color, 'rgba(27,20,40,.8)');
   }
 
   const rec = toScreen(m, (REC.x0 + REC.x1) / 2, REC.y0 - 8);
   const inside = [...state.workers.values()].filter(isOutOfSight).length;
   pill(`🎮 REC CENTER${inside ? ` · 💤 ${inside} inside` : ''}`, rec.x, rec.y, 14, '#f4e9c9', 'rgba(27,20,40,.8)');
+  if (CLAN_ID) drawClanLabels(m);
   const queue = reviewQueue().length;
-  const office = toScreen(m, OFFICE.x, OFFICE.y - 48);
+  const office = toScreen(m, OFFICE.x, OFFICE.y - (CLAN_ID ? 92 : 48));
   if (queue) pill(waitingLabel(queue), office.x, office.y, 18, '#1b1428', '#ffcc33');
 
   if (zoom >= 0.8) {
@@ -181,8 +221,10 @@ function drawLabels() {
       else pill(`${worker.look.name}${owner}`, at.x, at.y, nameSize, '#f4e9c9', 'rgba(27,20,40,.7)');
     }
   }
-  const you = toScreen(m, YOU.x, YOU.y + 9);
-  pill('YOU', you.x, you.y, 15, '#1b1428', '#ffcc33');
+  if (!CLAN_ID) {
+    const you = toScreen(m, YOU.x, YOU.y + 9);
+    pill('YOU', you.x, you.y, 15, '#1b1428', '#ffcc33');
+  }
   ctx.setTransform(m.zoom, 0, 0, m.zoom, m.ox, m.oy);
 }
 

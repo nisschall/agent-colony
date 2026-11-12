@@ -179,6 +179,8 @@ canvas#world.dragging { cursor: grabbing; }
 #board td, #board th { padding: 3px 6px; text-align: left; }
 #board th { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--muted); }
 #board tr.row:hover { background: var(--panel-hi); cursor: pointer; }
+#board .avatar { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; border-radius: 2px; }
+#board .visit { color: var(--gold); white-space: nowrap; }
 #board .num { text-align: right; white-space: nowrap; }
 
 #toasts { position: fixed; top: calc(var(--inset-top) + 60px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }

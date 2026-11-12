@@ -1,6 +1,6 @@
 // The town layout, generated from the seed the server keeps.
 import { BASE_LOTS, CENTREPIECES, FOUNTAIN, LOT_ROWS, MAP_W, MIN_LOT_GAP_TILES, PARK, PARK_DESIGNS, ROAD_COLUMNS, ROAD_ROWS, TILE, TOWN_EDGES } from './config.js';
-import { seeded, weightedPick } from './utils.js';
+import { hash, seeded, weightedPick } from './utils.js';
 
 // The town's layout comes from a seed the server keeps, so every screen shows the same town until you rebuild it.
 export const LAYOUT_SEED = Number(document.querySelector('meta[name="colony-layout"]').content) || 1;
@@ -79,6 +79,47 @@ function makeLayout(seed) {
     windingPhase: rand() * Math.PI * 2,
     treelineSeed: Math.floor(rand() * 100000) + 1,
   };
+}
+
+// A clan's town grows east of downtown: each district is a block of 10 lots along the two main roads,
+// with an avenue on its west side and a small square in the middle.
+export const DOWNTOWN_LOTS = BASE_LOTS.length;
+export const DISTRICT_LOTS = 10;
+export const DISTRICT_W = 56;
+export const MAX_DISTRICTS = 8;
+const DISTRICT_LOT_XS = [6, 17, 28, 39, 50];
+const DISTRICT_LOT_ROWS = [11, 41];
+export const DISTRICTS = [];
+
+export function townWidth() {
+  return (MAP_W + DISTRICTS.length * DISTRICT_W) * TILE;
+}
+
+export function districtLots(index) {
+  const first = DOWNTOWN_LOTS + index * DISTRICT_LOTS;
+  return Array.from({ length: DISTRICT_LOTS }, (_, k) => first + k);
+}
+
+// Lays out one district per owner ('' for shared repos that overflow downtown). Returns whether anything moved.
+export function setDistricts(owners) {
+  if (owners.join('\n') === DISTRICTS.map((d) => d.owner).join('\n')) return false;
+  DISTRICTS.length = 0;
+  LOTS.length = DOWNTOWN_LOTS;
+  LAYOUT.pads.length = DOWNTOWN_LOTS;
+  LAYOUT.driveways.length = DOWNTOWN_LOTS;
+  owners.forEach((owner, index) => {
+    const x0 = MAP_W + index * DISTRICT_W;
+    const seed = hash(`${owner}|${index}`);
+    DISTRICTS.push({ owner, x0, seed, square: { x: (x0 + DISTRICT_W / 2) * TILE, y: 27 * TILE } });
+    for (const row of DISTRICT_LOT_ROWS) {
+      DISTRICT_LOT_XS.forEach((x, k) => {
+        LOTS.push([x0 + x, row]);
+        LAYOUT.pads.push({ w: 104 + ((seed >>> k) % 20), h: 30 });
+        LAYOUT.driveways.push(((seed >>> (k + 5)) & 1) === 1);
+      });
+    }
+  });
+  return true;
 }
 
 export const REC_SLOTS = [

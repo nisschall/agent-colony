@@ -1,6 +1,7 @@
 // The camera: canvas size, fitting the town on screen, and world/screen coordinates.
 import { canvas } from './canvas.js';
 import { MAP_H, MAP_W, PARAMS, TILE, WALLPAPER } from './config.js';
+import { DISTRICTS, DISTRICT_W } from './layout.js';
 import { liteMode, state } from './state.js';
 
 export function resize() {
@@ -18,12 +19,16 @@ export function inset(side) {
   return Number(PARAMS.get(side)) || 0;
 }
 
+// A clan's town with districts opens on downtown and the first district, so you can see it carries on east.
 export function fitCamera() {
   if (!WALLPAPER) {
-    state.camera.x = MAP_W * TILE / 2;
+    const width = (MAP_W + (DISTRICTS.length ? DISTRICT_W : 0)) * TILE;
+    state.camera.x = width / 2;
     state.camera.y = MAP_H * TILE / 2 - 20;
-    const fit = Math.min(innerWidth / (MAP_W * TILE), innerHeight / (MAP_H * TILE)) * 1.15;
-    state.camera.zoom = Math.max(0.6, Math.min(3, fit));
+    // Downtown alone can crop a little grass at the edges; with a district beside it, show it all.
+    const overfit = DISTRICTS.length ? 1 : 1.15;
+    const fit = Math.min(innerWidth / width, innerHeight / (MAP_H * TILE)) * overfit;
+    state.camera.zoom = Math.max(minZoom(), Math.min(3, fit));
     return;
   }
   const top = inset('top') + STATUS_BAR_CLEARANCE;
@@ -38,6 +43,11 @@ export function fitCamera() {
   state.camera.zoom = zoom;
   state.camera.x = centerX - (left + availableWidth / 2 - innerWidth / 2) / zoom;
   state.camera.y = centerY - (top + availableHeight / 2 - innerHeight / 2) / zoom;
+}
+
+// A clan's town can grow wider than the screen, so it lets you zoom out far enough to see its districts.
+export function minZoom() {
+  return DISTRICTS.length ? 0.2 : 0.6;
 }
 
 export function worldToScreenMatrix() {

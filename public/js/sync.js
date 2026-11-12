@@ -1,10 +1,12 @@
 // Live data from the server: applying snapshots, placing buildings and reacting to changes.
 import { TIERS, addonsFor, floorsFor, varietyFor } from './buildings.js';
 import { clanSnapshot } from './clan.js';
-import { CLAN_ID, CODE_GLYPHS, FLOOR_H, FOUNTAIN, PARK, TILE, WALLPAPER, WALLS } from './config.js';
+import { CLAN_ID, CODE_GLYPHS, FLOOR_H, FOUNTAIN, MAX_FLOORS, PARK, TILE, WALLPAPER, WALLS } from './config.js';
 import { addChronicle, addToast, ingestEvents, renderHud } from './hud.js';
 import { identity } from './identity.js';
-import { LAYOUT_SEED, LOTS, YOU } from './layout.js';
+import { fitCamera } from './camera.js';
+import { DISTRICTS, DISTRICT_LOTS, DOWNTOWN_LOTS, LAYOUT_SEED, LOTS, MAX_DISTRICTS, YOU, districtLots } from './layout.js';
+import { growTown } from './scenery.js';
 import { targetFor } from './simulation.js';
 import { state } from './state.js';
 import { BUSY_STATUSES } from './ui/boards.js';
@@ -18,30 +20,73 @@ const rememberedLots = (() => {
   try { return JSON.parse(localStorage.getItem(LOTS_KEY)) || {}; } catch { return {}; }
 })();
 
-function freeLot(projectName) {
-  const used = new Set([...state.buildings.values()].map((b) => b.lot));
+const DOWNTOWN = Array.from({ length: DOWNTOWN_LOTS }, (_, index) => index);
+// Each extra member sharing a repo adds a floor, up to this many.
+const MAX_SHARED_FLOORS = 2;
+
+function freeLot(projectName, allowed, used) {
   const remembered = rememberedLots[projectName];
-  if (remembered !== undefined && !used.has(remembered)) return remembered;
+  if (allowed.includes(remembered) && !used.has(remembered)) return remembered;
   const claimed = new Set(Object.values(rememberedLots));
-  const fresh = LOTS.findIndex((_, index) => !used.has(index) && !claimed.has(index));
-  const lot = fresh >= 0 ? fresh : LOTS.findIndex((_, index) => !used.has(index));
+  const lot = allowed.find((index) => !used.has(index) && !claimed.has(index)) ?? allowed.find((index) => !used.has(index));
   rememberedLots[projectName] = lot;
   try { localStorage.setItem(LOTS_KEY, JSON.stringify(rememberedLots)); } catch { /* storage unavailable */ }
   return lot;
 }
 
+// Puts a group of projects into districts of 10 lots, adding as many as the group needs.
+function fillDistricts(owner, projects, owners, placements) {
+  for (let start = 0; start < projects.length && owners.length < MAX_DISTRICTS; start += DISTRICT_LOTS) {
+    const allowed = districtLots(owners.length);
+    owners.push(owner);
+    for (const project of projects.slice(start, start + DISTRICT_LOTS)) placements.push({ project, allowed });
+  }
+}
+
+// In a clan's town, repos several members work on go downtown and each member's own projects go to their
+// district east of it. Your own town is downtown only.
+function placementsFor(projects) {
+  if (!CLAN_ID) return projects.slice(0, DOWNTOWN_LOTS).map((project) => ({ project, allowed: DOWNTOWN }));
+  const shared = projects.filter((project) => project.members.length > 1);
+  const placements = shared.slice(0, DOWNTOWN_LOTS).map((project) => ({ project, allowed: DOWNTOWN }));
+  const owners = [];
+  fillDistricts('', shared.slice(DOWNTOWN_LOTS), owners, placements);
+  const logins = state.data.clan.members.map((member) => member.login);
+  for (const login of logins) {
+    const own = projects.filter((project) => project.members.length === 1 && project.members[0] === login);
+    fillDistricts(login, own, owners, placements);
+  }
+  growTown(owners);
+  return placements;
+}
+
+function sharedFloors(project) {
+  if (!CLAN_ID) return 0;
+  return Math.min(MAX_SHARED_FLOORS, project.members.length - 1);
+}
+
 function syncBuildings(projects) {
-  const live = new Set(projects.slice(0, LOTS.length).map((p) => p.name));
+  const placements = placementsFor(projects);
+  const live = new Set(placements.map(({ project }) => project.name));
   for (const name of [...state.buildings.keys()]) {
     if (!live.has(name)) state.buildings.delete(name);
   }
-  projects.slice(0, LOTS.length).forEach((project) => {
+  // A building keeps its lot while that lot is still allowed, so nothing shuffles when another project joins.
+  const used = new Set();
+  for (const { project, allowed } of placements) {
     const existing = state.buildings.get(project.name);
-    const index = existing ? existing.lot : freeLot(project.name);
+    if (existing && allowed.includes(existing.lot) && !used.has(existing.lot)) used.add(existing.lot);
+    else if (existing) existing.lot = undefined;
+  }
+  placements.forEach(({ project, allowed }) => {
+    const existing = state.buildings.get(project.name);
+    const index = existing && existing.lot !== undefined ? existing.lot : freeLot(project.name, allowed, used);
+    if (index === undefined) return;
+    used.add(index);
     const [lx, ly] = LOTS[index];
     const seed = existing ? existing.seed : hash(project.name);
     const variety = existing ? existing.variety : varietyFor(seed);
-    const floors = floorsFor(project, variety.floorWobble);
+    const floors = Math.min(MAX_FLOORS, floorsFor(project, variety.floorWobble) + sharedFloors(project));
     const tier = project.profile ? project.profile.tier : '';
     let building = existing;
     if (!building) {
@@ -77,6 +122,8 @@ function onSnapshot(data) {
   const first = !state.data;
   state.data = data;
   syncBuildings(data.projects);
+  // Districts only appear with the first snapshot, after the page fitted the camera to downtown.
+  if (first && DISTRICTS.length) fitCamera();
   const live = new Set();
   for (const agent of data.agents) {
     live.add(agent.id);

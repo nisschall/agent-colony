@@ -2,7 +2,7 @@
 import { DELIVERY_COOLDOWN_MS, VEHICLE_COLORS, VISITOR_LOOKS, dayMood, foodTruckOpen, isDaytime } from './ambient.js';
 import { ctx, rect } from './canvas.js';
 import { FOUNTAIN, MAP_W, PARK, TILE } from './config.js';
-import { FOOD_TRUCK } from './layout.js';
+import { FOOD_TRUCK, townWidth } from './layout.js';
 import { daylight } from './lighting.js';
 import { drawOutlinedPerson } from './people.js';
 import { directionOf } from './simulation.js';
@@ -22,7 +22,7 @@ export function sendDeliveryVan(building) {
   if (!row) return;
   state.lastDeliveryAt = now;
   const lane = { y: row * TILE + 11, dir: -1 };
-  state.visitors.push({ kind: 'van', x: MAP_W * TILE + 30, y: lane.y, dir: lane.dir, stopX: building.x, stage: 'arrive', timer: 0, project: building.name });
+  state.visitors.push({ kind: 'van', x: townWidth() + 30, y: lane.y, dir: lane.dir, stopX: building.x, stage: 'arrive', timer: 0, project: building.name });
 }
 
 function spawnVisitors(dt) {

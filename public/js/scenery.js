@@ -1,22 +1,31 @@
-// The static world: ground, roads, park, centrepiece, town edge, trees, rec center and review office.
+// The static world: ground, roads, park, centrepiece, town edge, trees, rec center, review office,
+// and in a clan's town the town hall and the districts east of downtown.
 import { rainAmount, windFactor } from './ambient.js';
 import { OUTLINE, canvas, ctx, rect, shade } from './canvas.js';
-import { FOUNTAIN, MAP_H, MAP_W, PARK, ROAD_COLUMNS, ROAD_ROWS, TILE } from './config.js';
-import { FOOD_TRUCK, LAYOUT, LOTS, NAP_SLOTS, OFFICE, REC } from './layout.js';
+import { FOUNTAIN, MAP_H, MAP_W, PARK, ROAD_COLUMNS, ROAD_ROWS, TILE, WALLS } from './config.js';
+import { DISTRICTS, DISTRICT_W, FOOD_TRUCK, LAYOUT, LOTS, NAP_SLOTS, OFFICE, REC, setDistricts, townWidth } from './layout.js';
 import { daylight, drawSunShadow } from './lighting.js';
 import { reviewQueue } from './simulation.js';
 import { state } from './state.js';
-import { hash, seeded } from './utils.js';
+import { hash, pick, seeded } from './utils.js';
 
 export const ground = document.createElement('canvas');
-ground.width = MAP_W * TILE;
-ground.height = MAP_H * TILE;
+const SQUARE_HALF_W = 9 * TILE;
+const SQUARE_HALF_H = 4 * TILE;
+
+// Downtown's two avenues, plus the one on the west side of each district.
+function roadColumns() {
+  return [...ROAD_COLUMNS, ...DISTRICTS.map((district) => district.x0)];
+}
 
 export function paintGround() {
+  ground.width = townWidth();
+  ground.height = MAP_H * TILE;
   const g = ground.getContext('2d');
   const rand = seeded(42);
+  const widthTiles = ground.width / TILE;
   for (let ty = 0; ty < MAP_H; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
+    for (let tx = 0; tx < widthTiles; tx++) {
       const grass = rand() < 0.5 ? '#5b9a48' : '#60a04c';
       g.fillStyle = grass;
       g.fillRect(tx * TILE, ty * TILE, TILE, TILE);
@@ -33,6 +42,7 @@ export function paintGround() {
   paintSidewalks(g);
   paintRoads(g);
   paintPark(g);
+  paintDistrictSquares(g);
   paintLotPads(g);
   paintGroundDetails(g);
 }
@@ -40,14 +50,16 @@ export function paintGround() {
 function paintRoads(g) {
   const roadTop = ROAD_ROWS[0] * TILE;
   const roadBottom = (ROAD_ROWS[1] + 2) * TILE;
+  const width = townWidth();
+  const columns = roadColumns();
   g.fillStyle = '#5c5a66';
-  for (const row of ROAD_ROWS) g.fillRect(0, row * TILE, MAP_W * TILE, 2 * TILE);
-  for (const col of ROAD_COLUMNS) g.fillRect(col * TILE, roadTop, 2 * TILE, roadBottom - roadTop - 2 * TILE);
+  for (const row of ROAD_ROWS) g.fillRect(0, row * TILE, width, 2 * TILE);
+  for (const col of columns) g.fillRect(col * TILE, roadTop, 2 * TILE, roadBottom - roadTop - 2 * TILE);
   g.fillStyle = '#e8d77a';
   for (const row of ROAD_ROWS) {
-    for (let x = 0; x < MAP_W * TILE; x += 16) g.fillRect(x + 2, row * TILE + 15, 8, 2);
+    for (let x = 0; x < width; x += 16) g.fillRect(x + 2, row * TILE + 15, 8, 2);
   }
-  for (const col of ROAD_COLUMNS) {
+  for (const col of columns) {
     for (let y = roadTop; y < roadBottom; y += 16) g.fillRect(col * TILE + 15, y + 2, 2, 8);
   }
   g.fillStyle = '#f4f4f4';
@@ -121,6 +133,30 @@ function distanceToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+// Each district's square: a lawn ringed by a path, with a paved circle for its flag in the middle.
+function paintDistrictSquares(g) {
+  for (const { square } of DISTRICTS) {
+    const x0 = square.x - SQUARE_HALF_W;
+    const y0 = square.y - SQUARE_HALF_H;
+    g.fillStyle = '#69ab53';
+    g.fillRect(x0, y0, SQUARE_HALF_W * 2, SQUARE_HALF_H * 2);
+    g.fillStyle = '#d8c39a';
+    g.fillRect(x0 + 6, y0 + 6, SQUARE_HALF_W * 2 - 12, 5);
+    g.fillRect(x0 + 6, y0 + SQUARE_HALF_H * 2 - 11, SQUARE_HALF_W * 2 - 12, 5);
+    g.fillRect(x0 + 6, y0 + 6, 5, SQUARE_HALF_H * 2 - 12);
+    g.fillRect(x0 + SQUARE_HALF_W * 2 - 11, y0 + 6, 5, SQUARE_HALF_H * 2 - 12);
+    g.fillRect(x0 + 6, square.y - 2, SQUARE_HALF_W * 2 - 12, 5);
+    g.fillStyle = '#cbb588';
+    g.beginPath();
+    g.arc(square.x, square.y, 20, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+function inDistrictSquare(x, y, margin) {
+  return DISTRICTS.some(({ square }) => Math.abs(x - square.x) < SQUARE_HALF_W + margin && Math.abs(y - square.y) < SQUARE_HALF_H + margin);
+}
+
 function paintLotPads(g) {
   LOTS.forEach(([lx, ly], index) => {
     const pad = LAYOUT.pads[index];
@@ -141,6 +177,49 @@ function paintLotPads(g) {
 export const TREES = [];
 export const BENCHES = [];
 export const LAMPS = [];
+
+// Trees, benches and lamps for the districts, rebuilt whenever they change.
+function placeDistrictScenery() {
+  for (const list of [TREES, BENCHES, LAMPS]) {
+    const downtown = list.filter((item) => !item.district);
+    list.splice(0, list.length, ...downtown);
+  }
+  for (const district of DISTRICTS) {
+    const rand = seeded(district.seed || 1);
+    const { square } = district;
+    const left = (district.x0 + 3) * TILE;
+    const width = (DISTRICT_W - 4) * TILE;
+    for (let placed = 0, tries = 0; placed < 14 && tries < 80; tries++) {
+      const x = left + rand() * width;
+      const y = 16 * TILE + rand() * 17 * TILE;
+      if (inDistrictSquare(x, y, 12)) continue;
+      placed += 1;
+      TREES.push({ x, y, r: 9 + rand() * 5, hue: rand(), district: true });
+    }
+    BENCHES.push({ x: square.x - 44, y: square.y + 16, district: true }, { x: square.x + 44, y: square.y + 16, district: true });
+    LAMPS.push(
+      { x: square.x - 30, y: square.y - 22, district: true }, { x: square.x + 30, y: square.y - 22, district: true },
+      { x: (district.x0 + 1) * TILE, y: 12.5 * TILE, district: true }, { x: (district.x0 + 1) * TILE, y: 45.5 * TILE, district: true },
+    );
+  }
+}
+
+// Lays out a clan's districts and repaints the ground when they change.
+export function growTown(owners) {
+  if (!setDistricts(owners)) return;
+  paintGround();
+  placeDistrictScenery();
+}
+
+export function drawDistrictFlag(district) {
+  const { x, y } = district.square;
+  const color = pick(WALLS, district.seed);
+  rect(x - 1, y - 30, 2, 30, '#8f8a99');
+  rect(x - 2, y - 32, 4, 2, '#d9a441');
+  const wave = Math.round(Math.sin(state.time * 2 * windFactor() + district.seed) * 1.5);
+  for (let i = 0; i < 4; i++) rect(x + 1 + i * 4, y - 29 + (i % 2 ? wave : 0), 4, 9, i % 2 ? shade(color, -20) : color);
+  rect(x - 4, y - 2, 8, 3, '#7a7484');
+}
 
 export function placeScenery() {
   const rand = seeded(7);
@@ -307,6 +386,60 @@ function drawFountain() {
   }
 }
 
+// The clan's town hall: one window per member, lit while they are online.
+const TOWN_HALL_WINDOWS = 8;
+export const TOWN_HALL = { x0: OFFICE.x - 36, x1: OFFICE.x + 36, y0: OFFICE.y - 58, y1: OFFICE.y + 4 };
+
+export function drawTownHall() {
+  const { x, y } = OFFICE;
+  const members = state.data && state.data.clan ? state.data.clan.members.slice(0, TOWN_HALL_WINDOWS) : [];
+  rect(x - 38, y - 1, 76, 6, 'rgba(0,0,0,.25)');
+  rect(x - 36, y - 4, 72, 4, '#a39eac');
+  rect(x - 32, y - 8, 64, 4, '#c0bac8');
+  rect(x - 28, y - 36, 56, 28, '#ece4cf');
+  rect(x + 22, y - 36, 6, 28, '#d8cfb6');
+  for (const dx of [-24, -14, 10, 20]) {
+    rect(dx + x, y - 34, 4, 26, '#fff8e6');
+    rect(dx + x + 3, y - 34, 1, 26, '#d8cfb6');
+  }
+  rect(x - 6, y - 22, 12, 14, '#5a3a22');
+  rect(x - 6, y - 24, 12, 2, '#3a2a1a');
+  // A window per member above the door, lit while that member is online.
+  const span = members.length * 6;
+  members.forEach((member, i) => {
+    const wx = x - span / 2 + i * 6 + 1;
+    rect(wx, y - 32, 4, 5, member.online ? '#ffe08a' : '#3a4a66');
+    if (member.online) state.lights.push({ x: wx + 2, y: y - 30, r: 8 });
+  });
+  ctx.fillStyle = '#d8cfb6';
+  ctx.beginPath();
+  ctx.moveTo(x - 32, y - 37);
+  ctx.lineTo(x + 32, y - 37);
+  ctx.lineTo(x, y - 50);
+  ctx.closePath();
+  ctx.fill();
+  rect(x - 32, y - 38, 64, 2, '#b8ae94');
+  rect(x - 3, y - 45, 6, 5, '#d9a441');
+  rect(x - 1, y - 62, 1, 13, '#5a5466');
+  const wave = Math.round(Math.sin(state.time * 2 * windFactor()) * 1);
+  rect(x, y - 62, 5, 4, '#ffcc33');
+  rect(x + 5, y - 61 + wave, 4, 4, '#f2b62c');
+}
+
+// An unused lot in a clan's town: a lawn with a low hedge and a few flowers.
+export function drawGardenLot(x, y, pad) {
+  const left = x - pad.w / 2;
+  const top = y - 6;
+  rect(left, top, pad.w, pad.h, '#69ab53');
+  rect(left, top, pad.w, 3, '#3f7a3a');
+  rect(left, top + pad.h - 3, pad.w, 3, '#3f7a3a');
+  for (let i = 0; i < 6; i++) {
+    const fx = left + 10 + ((i * 37) % (pad.w - 20));
+    const fy = top + 8 + ((i * 11) % (pad.h - 16));
+    rect(fx, fy, 2, 2, i % 2 ? '#f08bb4' : '#f2e46b');
+  }
+}
+
 export function drawEmptyLot(x, y) {
   rect(x - 10, y - 18, 2, 18, '#6b4a2b');
   rect(x - 26, y - 30, 34, 13, '#e8dcb5');
@@ -321,17 +454,19 @@ export function drawEmptyLot(x, y) {
 // ---- ground details, painted once into the ground canvas ----
 function isOpenGrass(x, y) {
   const onRoadRow = ROAD_ROWS.some((row) => y > row * TILE - 4 && y < (row + 2) * TILE + 4);
-  const onRoadColumn = ROAD_COLUMNS.some((col) => x > col * TILE - 4 && x < (col + 2) * TILE + 4) && y > 13 * TILE && y < 45 * TILE;
+  const onRoadColumn = roadColumns().some((col) => x > col * TILE - 4 && x < (col + 2) * TILE + 4) && y > 13 * TILE && y < 45 * TILE;
   const onLot = LOTS.some(([lx, ly]) => Math.abs(x - lx * TILE) < 64 && y > ly * TILE - 160 && y < ly * TILE + 28);
   const inPark = x > PARK.x0 - 4 && x < PARK.x1 + 4 && y > PARK.y0 - 4 && y < PARK.y1 + 4;
-  return !onRoadRow && !onRoadColumn && !onLot && !inPark;
+  return !onRoadRow && !onRoadColumn && !onLot && !inPark && !inDistrictSquare(x, y, 4);
 }
 
 function paintGroundDetails(g) {
   const rand = seeded(7331);
   const petals = ['#f2e46b', '#f08bb4', '#f4f4f4', '#9b7bff', '#ff9a5a'];
-  for (let placed = 0, tries = 0; placed < 90 && tries < 600; tries++) {
-    const x = Math.floor(rand() * MAP_W * TILE);
+  const width = townWidth();
+  const target = Math.round((90 * width) / (MAP_W * TILE));
+  for (let placed = 0, tries = 0; placed < target && tries < target * 7; tries++) {
+    const x = Math.floor(rand() * width);
     const y = Math.floor(rand() * MAP_H * TILE);
     const kind = rand();
     if (!isOpenGrass(x, y)) continue;

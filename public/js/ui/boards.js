@@ -3,7 +3,7 @@ import { fitCamera } from '../camera.js';
 import { canvas } from '../canvas.js';
 import { addToast, autonomy, statusLabel } from '../hud.js';
 import { efficiency, identity, levelOf, prettyModel, xpOf } from '../identity.js';
-import { LAYOUT_SEED, YOU } from '../layout.js';
+import { DISTRICTS, LAYOUT_SEED, YOU } from '../layout.js';
 import { TIME_PRESETS } from '../lighting.js';
 import { HIRED_MARK, HIRED_VEST, drawPerson } from '../people.js';
 import { state } from '../state.js';
@@ -50,6 +50,7 @@ export function renderBoard(mode) {
 }
 
 // A clan's members: who is online, how many agents they have here, and how many are waiting on them.
+// A member with a district can be clicked to visit it.
 function renderMembers(board) {
   const clan = state.data && state.data.clan;
   document.getElementById('boardTitle').innerHTML = `${icon('users')} ${escapeHtml(clan ? clan.name.toUpperCase() : 'CLAN')} — MEMBERS`;
@@ -58,12 +59,30 @@ function renderMembers(board) {
     const seen = m.online ? '<span style="color:var(--green)">● online</span>' : `<span style="color:var(--muted)">${m.lastSeen ? `seen ${duration(Date.now() - m.lastSeen)} ago` : 'not linked yet'}</span>`;
     const waiting = m.waiting ? `<span style="color:var(--gold)">${m.waiting}</span>` : '<span style="color:var(--muted)">0</span>';
     const name = m.name && m.name !== m.login ? ` <span style="color:var(--muted)">${escapeHtml(m.name)}</span>` : '';
-    return `<tr><td>${escapeHtml(m.login)}${name}</td><td>${m.role === 'leader' ? 'Leader' : 'Member'}</td><td>${seen}</td>`
-      + `<td class="num">${m.agents}</td><td class="num">${waiting}</td></tr>`;
+    const avatar = m.avatarUrl ? `<img class="avatar" src="${escapeHtml(m.avatarUrl)}" alt="">` : '';
+    const hasDistrict = DISTRICTS.some((district) => district.owner === m.login);
+    const visit = hasDistrict ? `<span class="visit">${icon('home')} VISIT</span>` : '';
+    const attrs = hasDistrict ? ` class="row" data-login="${escapeHtml(m.login)}" title="Visit ${escapeHtml(m.login)}'s district"` : '';
+    return `<tr${attrs}><td>${avatar}${escapeHtml(m.login)}${name}</td><td>${m.role === 'leader' ? 'Leader' : 'Member'}</td><td>${seen}</td>`
+      + `<td class="num">${m.agents}</td><td class="num">${waiting}</td><td>${visit}</td></tr>`;
   });
   board.querySelector('#boardBody').innerHTML = rows.length
-    ? `<table><tr><th>MEMBER</th><th>ROLE</th><th>STATUS</th><th class="num">AGENTS</th><th class="num">WAITING ON THEM</th></tr>${rows.join('')}</table>${agentsNow()}`
+    ? `<table><tr><th>MEMBER</th><th>ROLE</th><th>STATUS</th><th class="num">AGENTS</th><th class="num">WAITING ON THEM</th><th></th></tr>${rows.join('')}</table>${agentsNow()}`
     : '<p>No members yet.</p>';
+}
+
+function visitDistrict(login) {
+  const district = DISTRICTS.find((d) => d.owner === login);
+  if (!district) return;
+  state.following = false;
+  state.camera.x = district.square.x;
+  state.camera.y = district.square.y - 40;
+  state.camera.zoom = 1;
+}
+
+export function openMembers() {
+  if (document.getElementById('board').classList.contains('open') && state.boardMode === 'members') return;
+  toggleBoard('members');
 }
 
 const AGENTS_PER_MEMBER = 5;
@@ -235,6 +254,12 @@ document.getElementById('btnWard').onclick = () => toggleBoard('ward');
 document.getElementById('btnMembers').onclick = () => toggleBoard('members');
 document.getElementById('boardClose').onclick = () => toggleBoard(state.boardMode);
 document.getElementById('boardBody').addEventListener('click', (e) => {
+  const member = e.target.closest('tr[data-login]');
+  if (member) {
+    toggleBoard(state.boardMode);
+    visitDistrict(member.dataset.login);
+    return;
+  }
   const row = e.target.closest('tr[data-id]');
   if (!row) return;
   toggleBoard(state.boardMode);

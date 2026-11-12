@@ -1,14 +1,15 @@
 // Mouse and keyboard: panning, zooming, hovering and clicking things in the town.
 import { DAY_MS, FEATURES, LAYER_LABELS, TIERS, buildingHealth, problemLines, starsOf } from './buildings.js';
-import { screenToWorld } from './camera.js';
+import { minZoom, screenToWorld } from './camera.js';
 import { canvas } from './canvas.js';
 import { CLAN_ID } from './config.js';
 import { statusLabel } from './hud.js';
 import { prettyModel } from './identity.js';
 import { YOU } from './layout.js';
 import { HIRED_MARK, HIRED_VEST, isOutOfSight } from './people.js';
+import { TOWN_HALL } from './scenery.js';
 import { state } from './state.js';
-import { toggleCrew } from './ui/boards.js';
+import { openMembers, toggleCrew } from './ui/boards.js';
 import { closeBuildingMenu, closeHireForm, openBuildingMenu, openGroundMenu } from './ui/forms.js';
 import { closeSheet, selectWorker } from './ui/sheet.js';
 import { compact, escapeHtml, icon, money, siteOf } from './utils.js';
@@ -53,6 +54,7 @@ canvas.addEventListener('pointerup', (e) => {
   const hit = hitTest(e.clientX, e.clientY);
   if (hit && hit.type === 'worker') selectWorker(hit.worker.agent.id, false);
   else if (hit && hit.type === 'building') openBuildingMenu(hit.building, e.clientX, e.clientY);
+  else if (hit && hit.type === 'townHall') openMembers();
   else {
     closeSheet();
     openGroundMenu(e.clientX, e.clientY);
@@ -63,7 +65,7 @@ canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const before = screenToWorld(e.clientX, e.clientY);
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  state.camera.zoom = Math.max(0.6, Math.min(7, state.camera.zoom * factor));
+  state.camera.zoom = Math.max(minZoom(), Math.min(7, state.camera.zoom * factor));
   const after = screenToWorld(e.clientX, e.clientY);
   state.camera.x += before.x - after.x;
   state.camera.y += before.y - after.y;
@@ -86,6 +88,8 @@ function hitTest(sx, sy) {
     const h = building.hit;
     if (h && p.x >= h.x0 && p.x <= h.x1 && p.y >= h.y0 && p.y <= h.y1) return { type: 'building', building };
   }
+  const inTownHall = p.x >= TOWN_HALL.x0 && p.x <= TOWN_HALL.x1 && p.y >= TOWN_HALL.y0 && p.y <= TOWN_HALL.y1;
+  if (CLAN_ID && inTownHall) return { type: 'townHall' };
   return null;
 }
 
@@ -140,6 +144,8 @@ function updateHover(sx, sy) {
     if (a.portal) html += `<br><span style="color:${HIRED_VEST}">${HIRED_MARK} Hired from the town · click to give orders</span>`;
     if (a.status === 'waiting' && a.waitingAsk) html += `<br><span style="color:var(--gold)">Asks: ${escapeHtml(a.waitingAsk)}</span>`;
     if (a.summary) html += `<br><span style="color:var(--muted)">${icon('message')} ${escapeHtml(a.summary.text)}</span>`;
+  } else if (hit.type === 'townHall') {
+    html = '<b style="color:var(--gold)">Town hall</b><br>Click to see the members and visit their districts';
   } else {
     html = buildingTooltip(hit.building);
   }

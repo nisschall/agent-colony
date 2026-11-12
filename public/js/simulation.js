@@ -1,7 +1,7 @@
 // Moving agents: where each one should be, walking there, and you following your focus.
 import { IDLE_WANDER_CHANCE, PARK_ACTIVITIES, foodTruckOpen, updateAmbient } from './ambient.js';
-import { CODE_GLYPHS, FOUNTAIN, MAP_W, PARK, ROAD_ROWS, TILE, WALK_SPEED } from './config.js';
-import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU } from './layout.js';
+import { CLAN_ID, CODE_GLYPHS, FOUNTAIN, PARK, ROAD_ROWS, TILE, WALK_SPEED } from './config.js';
+import { FOCUS_TIMEOUT_MS, FOOD_TRUCK, NAP_SLOTS, OFFICE, REC, REC_SLOTS, YOU, townWidth } from './layout.js';
 import { BENCHES } from './scenery.js';
 import { state } from './state.js';
 import { addFloater } from './sync.js';
@@ -26,9 +26,12 @@ export function reviewQueue() {
   return state.data.agents.filter((a) => a.status === 'waiting').sort((a, b) => a.waitingSince - b.waitingSince);
 }
 
+// The town hall is wider than the review office, so a clan's queue starts further out.
+const QUEUE_START_X = CLAN_ID ? 48 : 36;
+
 function queueSpot(worker) {
   const index = Math.max(0, reviewQueue().findIndex((a) => a.id === worker.agent.id));
-  return { x: OFFICE.x + 36 + (index % 6) * 13, y: OFFICE.y + 8 + Math.floor(index / 6) * 12 };
+  return { x: OFFICE.x + QUEUE_START_X + (index % 6) * 13, y: OFFICE.y + 8 + Math.floor(index / 6) * 12 };
 }
 
 export function targetFor(worker, data) {
@@ -99,7 +102,7 @@ export function sendAway(agentId) {
   const worker = state.workers.get(agentId);
   if (!worker) return;
   const roadY = nearestRoadY(worker.y);
-  worker.leaving = [{ x: worker.x, y: roadY }, { x: MAP_W * TILE + TILE, y: roadY }];
+  worker.leaving = [{ x: worker.x, y: roadY }, { x: townWidth() + TILE, y: roadY }];
   worker.target = worker.leaving.shift();
 }
 

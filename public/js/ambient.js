@@ -1,7 +1,8 @@
 // The colony's day: weather, traffic, clouds, birds and the error storm.
 import { canvas, ctx, rect, shade } from './canvas.js';
-import { MAP_H, MAP_W, TILE } from './config.js';
+import { MAP_H, TILE } from './config.js';
 import { addToast } from './hud.js';
+import { townWidth } from './layout.js';
 import { currentHour, daylight } from './lighting.js';
 import { state } from './state.js';
 import { hash, seeded, weightedPick } from './utils.js';
@@ -61,7 +62,7 @@ function moodFor(dateKey) {
 function applyMood(mood) {
   dayMood = mood;
   const rand = mood.rand;
-  const worldWidth = MAP_W * TILE;
+  const worldWidth = townWidth();
   const vehicles = Array.from({ length: mood.carCount }, () => ({ kind: 'car', speed: 34 + rand() * 22 }));
   if (mood.bus) vehicles.push({ kind: 'bus', speed: 26 });
   CARS.length = 0;
@@ -122,7 +123,7 @@ function recentErrorCount() {
 }
 
 export function updateAmbient(dt) {
-  const worldWidth = MAP_W * TILE;
+  const worldWidth = townWidth();
   const today = new Date().toDateString();
   if (!dayMood || dayMood.key !== today) applyMood(moodFor(today));
   updateVisitors(dt);
